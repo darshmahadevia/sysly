@@ -1,0 +1,20 @@
+{
+  "kind": "sysly_theme",
+  "version": 1,
+  "theme": {
+    "name": "Paper",
+    "background": [242, 243, 246],
+    "surface": [255, 255, 255],
+    "text": [31, 34, 42],
+    "muted": [96, 101, 115],
+    "divider": [216, 219, 227],
+    "accent": [107, 80, 206],
+    "cpu": [107, 80, 206],
+    "memory": [27, 126, 104],
+    "gpu": [166, 94, 33],
+    "network": [39, 112, 186],
+    "danger": [186, 49, 68],
+    "font": "system",
+    "font_size": 13
+  }
+}

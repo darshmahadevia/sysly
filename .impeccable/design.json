@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-16T17:49:23.644792+00:00",
+  "title": "Design System: Sysly",
+  "extensions": {
+    "colorMeta": {
+      "background": {
+        "role": "neutral",
+        "displayName": "Graphite background"
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Section surface"
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Primary text"
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted text"
+      },
+      "divider": {
+        "role": "neutral",
+        "displayName": "Divider"
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Control accent"
+      },
+      "cpu": {
+        "role": "secondary",
+        "displayName": "CPU cyan"
+      },
+      "memory": {
+        "role": "secondary",
+        "displayName": "Memory sea glass"
+      },
+      "gpu": {
+        "role": "secondary",
+        "displayName": "Graphics amber"
+      },
+      "network": {
+        "role": "secondary",
+        "displayName": "Network blue"
+      },
+      "danger": {
+        "role": "secondary",
+        "displayName": "Process action danger"
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Page heading",
+        "purpose": "Page title in the selected UI font."
+      },
+      "data": {
+        "displayName": "Tabular data",
+        "purpose": "Menlo process columns and compact sidebar readings."
+      },
+      "reading": {
+        "displayName": "Prominent reading",
+        "purpose": "Processor reading in the selected UI font."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "page-transition",
+        "value": "180ms cubic-out, opacity 0.86 to 1",
+        "purpose": "Fade the page after navigation."
+      }
+    ],
+    "breakpoints": [],
+    "nativeInteractions": {
+      "renderer": "Rust GPUI 0.2.2 with gpui-component 0.5.1",
+      "componentSamples": "Representational HTML/CSS for the design panel; the app uses native GPUI elements.",
+      "sourceFiles": [
+        "src/app.rs",
+        "src/preferences.rs",
+        "src/main.rs"
+      ],
+      "window": {
+        "initial": "1320 × 900 logical pixels",
+        "minimum": "1000 × 700 logical pixels",
+        "sidebar": "204 logical pixels"
+      },
+      "layout": "Adjacent half-width sections remain paired at the supported minimum width. Content scrolls vertically.",
+      "verification": "scripts/verify_gpui.py uses Swift window control and Vision OCR because GPUI 0.2.2 does not expose content labels through Accessibility.",
+      "reviewArtifacts": "artifacts/redesign"
+    }
+  },
+  "components": [
+    {
+      "name": "Action button",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "Representational sample of the native action button. GPUI owns the real interaction.",
+      "html": "<button class=\"ds-button\">Pause</button>",
+      "css": ".ds-button{font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#eff0f4;height:32px;padding:0 12px;font-size:12px;font-weight:500;border:1px solid transparent;border-radius:7px;background:rgb(43 51 61 / 45%);cursor:pointer}.ds-button:hover{background:#2b333d}.ds-button:focus-visible{outline:none;border-color:#83abf8}.ds-button:active{background:#2b333d}"
+    },
+    {
+      "name": "Process search",
+      "kind": "input",
+      "description": "Representational search field. The application uses gpui-component InputState.",
+      "html": "<input class=\"ds-search\" aria-label=\"Search name, PID or user\" placeholder=\"Search name, PID or user\">",
+      "css": ".ds-search{font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#eff0f4;width:290px;font-size:13px;background:#1a1f26;border:1px solid #2b333d;border-radius:6px;padding:7px 10px}.ds-search::placeholder{color:#9ca9b5}.ds-search:hover{border-color:#9ca9b5}.ds-search:focus-visible{outline:1px solid #83abf8}"
+    },
+    {
+      "name": "Sidebar navigation",
+      "kind": "nav",
+      "refersTo": "navigation-active",
+      "description": "Primary sidebar navigation with tonal selection and shortcut hints.",
+      "html": "<nav class=\"ds-nav\"><button aria-current=\"page\">Overview <span>⌘1</span></button><button>Apps &amp; processes <span>⌘2</span></button><button>Appearance <span>⌘,</span></button></nav>",
+      "css": ".ds-nav{font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#eff0f4;width:180px;background:#13171c;padding:12px}.ds-nav button{display:flex;align-items:center;gap:12px;width:100%;height:41px;padding:0 12px;margin:0 0 4px;border:0;border-radius:8px;background:transparent;color:#9ca9b5;font:12.5px -apple-system,BlinkMacSystemFont,sans-serif;text-align:left;cursor:pointer}.ds-nav span{margin-left:auto;font-size:10px;color:#9ca9b5}.ds-nav button[aria-current]{color:#eff0f4;background:rgb(43 51 61 / 60%)}.ds-nav button:hover{background:rgb(43 51 61 / 40%)}.ds-nav button:focus-visible{outline:1px solid #83abf8}"
+    },
+    {
+      "name": "Processor card",
+      "kind": "card",
+      "refersTo": "section",
+      "description": "Representative native section composition. The reading is illustrative.",
+      "html": "<article class=\"ds-card\"><header>Processor <span>View details ›</span></header><p><strong>7.2</strong> % in use</p><footer>How much work your Mac is doing</footer></article>",
+      "css": ".ds-card{font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#eff0f4;background:#1a1f26;border-radius:14px;padding:23px;min-width:260px}.ds-card header{display:flex;justify-content:space-between;align-items:center;gap:20px;font-size:14px;font-weight:600}.ds-card header span{color:#9ca9b5;font-size:11px;font-weight:400}.ds-card p{margin:19px 0;color:#9ca9b5;font-size:11px}.ds-card strong{font-size:36px;font-weight:500;color:#64cdd7}.ds-card footer{color:#9ca9b5;font-size:11px}"
+    },
+    {
+      "name": "Sampled history",
+      "kind": "custom",
+      "description": "Illustrative CPU trace with a sampling gap. Native geometry uses GPUI canvas paths.",
+      "html": "<div class=\"ds-history\"><svg viewBox=\"0 0 300 90\" role=\"img\" aria-label=\"Illustrative CPU history with a gap\"><path class=\"ds-guides\" d=\"M0 1H300M0 23H300M0 45H300M0 67H300M0 89H300\"/><path class=\"ds-trace\" d=\"M0 70L35 61L65 68L100 45L130 63M175 58L205 72L235 50L270 64L300 68\"/></svg></div>",
+      "css": ".ds-history{background:#1a1f26;padding:23px}.ds-history svg{display:block;width:100%;height:90px}.ds-guides{fill:none;stroke:#2b333d;stroke-width:1}.ds-trace{fill:none;stroke:#64cdd7;stroke-width:1.6}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Your Mac, at a glance",
+    "overview": "Sysly presents system activity in a native Rust GPUI window. Graphite backgrounds, aligned readings, and resource colors give charts priority. The catalog-inspired direction uses spacing and typography to separate navigation, measurements, and actions.\n\nThese tokens record the default Graphite theme in `src/preferences.rs` and its application in `src/app.rs`. Saved themes, custom fonts, and layouts override defaults. Measurements use plain-language captions and explicit units.",
+    "keyCharacteristics": [
+      "A persistent sidebar with live resource readings.",
+      "Colored history traces and a segmented memory composition.",
+      "Tonal cards, rounded controls, and fine separators.",
+      "User-controlled appearance, copy, and section layout."
+    ],
+    "rules": [],
+    "dos": [
+      "Do pair measurements with units and plain-language captions.",
+      "Do preserve resource color roles across charts and navigation.",
+      "Do retain saved themes, custom fonts, copy, and section arrangements.",
+      "Do show gaps when sampling pauses or a reading is unavailable."
+    ],
+    "donts": [
+      "Don't present missing telemetry as zero.",
+      "Don't add decorative shadows or continuous decorative animation to the monitoring workspace.",
+      "Don't imply that memory use alone measures memory pressure.",
+      "Don't hide the consequence of a process action behind an unlabeled icon."
+    ]
+  }
+}

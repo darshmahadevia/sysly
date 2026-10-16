@@ -1,0 +1,20 @@
+{
+  "kind": "sysly_theme",
+  "version": 1,
+  "theme": {
+    "name": "Ember",
+    "background": [24, 22, 22],
+    "surface": [35, 31, 30],
+    "text": [245, 239, 230],
+    "muted": [177, 162, 151],
+    "divider": [62, 52, 47],
+    "accent": [242, 160, 105],
+    "cpu": [242, 160, 105],
+    "memory": [147, 201, 172],
+    "gpu": [212, 168, 228],
+    "network": [138, 186, 227],
+    "danger": [247, 128, 128],
+    "font": "system",
+    "font_size": 14
+  }
+}

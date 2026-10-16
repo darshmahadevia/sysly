@@ -1,0 +1,37 @@
+[package]
+name = "sysly"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "A quiet system monitor for macOS"
+license = "MIT"
+
+[dependencies]
+gpui = { version = "=0.2.2", features = ["runtime_shaders"] }
+gpui-component = "=0.5.1"
+gpui-component-assets = "=0.5.1"
+sysinfo = "=0.38.4"
+macmon = { version = "=0.10.0", default-features = false }
+tray-icon = { version = "=0.21.3", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+libc = "0.2"
+core-foundation = "0.10"
+rfd = { version = "0.15", default-features = false }
+ttf-parser = "0.25"
+objc2 = "0.6.5"
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSView", "NSMenu", "NSMenuItem", "NSTextField", "NSControl", "NSCell", "NSFont", "NSFontDescriptor", "NSText", "NSColor", "NSBox", "NSStatusItem", "NSStatusBarButton", "NSButton", "NSAccessibilityProtocols"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSString", "NSGeometry", "NSTimer", "NSRunLoop", "block2"] }
+block2 = "0.6.2"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[profile.release.build-override]
+strip = false
+
+[patch.crates-io]
+macmon = { path = "vendor/macmon" }

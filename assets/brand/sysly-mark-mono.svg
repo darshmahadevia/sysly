@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="216 198 616 628" role="img" aria-label="Sysly live signal logo"><defs>
+  <linearGradient id="signal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#83ABF8"/><stop offset=".52" stop-color="#64CDD7"/><stop offset="1" stop-color="#77D6B7"/></linearGradient>
+  <linearGradient id="tile" x1="0" y1="0" x2=".7" y2="1"><stop stop-color="#2B3540"/><stop offset="1" stop-color="#131A22"/></linearGradient>
+</defs><path d="M616 282 L432 282 C352 282 300 326 300 390 C300 446 336 474 408 490 L608 534 C680 550 716 578 716 634 C716 698 664 742 584 742 L368 742" fill="none" stroke="currentColor" stroke-width="88" stroke-linecap="round" stroke-linejoin="round"/><circle cx="744" cy="282" r="44" fill="currentColor"/></svg>
