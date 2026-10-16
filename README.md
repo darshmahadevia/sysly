@@ -1,56 +1,106 @@
+<p align="center">
+  <img src="assets/brand/sysly-icon.png" alt="Sysly icon" width="96">
+</p>
+
 # Sysly
 
-A native Rust GPUI system monitor for Apple Silicon Macs. A graphite dashboard shows live resource history, memory composition, and process activity. Resource pages and process inspection provide more detail.
+A native system monitor for Apple Silicon Macs, built with Rust and GPUI.
 
-## Run
+See what is using your Mac's resources, inspect individual processes, and arrange the dashboard around the readings you care about. Sysly keeps CPU and memory summaries in the menu bar when you close the window.
 
-Build the macOS app with Rust 1.88 or newer and the Xcode command-line tools.
+![Sysly dashboard with memory, graphics, and network activity](artifacts/logo/dashboard.png)
+
+## What you can do
+
+- Track CPU and per-core activity, GPU activity, memory, swap, disk I/O, network traffic, and battery status.
+- Read temperatures, frequencies, power estimates, and fan speeds where your hardware exposes them.
+- Search processes by name, PID, or user. Sort the list, browse a process tree, and inspect commands and resource use.
+- Terminate, force quit, pause, or resume a process after confirmation, within your account's permissions.
+- Drag dashboard sections into place, change their width, resize charts, and edit labels and descriptions.
+- Choose colors and fonts, save named layouts, and import or export themes and layouts.
+- Adjust the history window, refresh rate, display density, and menu bar readings.
+
+Missing hardware readings appear as unavailable.
+
+## Build and run
+
+You need an Apple Silicon Mac with macOS 14 or later, Rust 1.88 or newer, and the Xcode Command Line Tools.
+
+If you have not installed the Command Line Tools, run:
 
 ```sh
+xcode-select --install
+```
+
+Clone the repository and build the app:
+
+```sh
+git clone https://github.com/darshmahadevia/sysly.git
+cd sysly
 scripts/bundle.sh
 open dist/Sysly.app
 ```
 
-For development, run `cargo run --locked`. The app uses GPUI 0.2.2 and gpui-component 0.5.1. The `runtime_shaders` feature supports builds with Command Line Tools.
+The script creates `dist/Sysly.app` and `dist/Sysly.zip`. It signs the app with an ad-hoc signature for local use. Distribution to other Macs requires your own Developer ID signing and notarization.
 
-Closing the window keeps the menu bar summary running when the menu bar is available. Use its menu to reopen the dashboard, pause sampling, or quit.
+For development, launch the app directly:
 
-The bundle is ad-hoc signed for local use. Distribution to other Macs requires your own Developer ID signing and notarization.
+```sh
+cargo run --locked
+```
 
-## Make it yours
+Sysly uses GPUI 0.2.2 and gpui-component 0.5.1. GPUI's `runtime_shaders` feature lets the app build with Command Line Tools.
 
-Open **Appearance** with Command-Comma. Choose **Layout & text** to drag sections into a new order, change their width, resize charts, and edit dashboard copy. The other tabs control colors, typography, density, history, refresh rate, and menu bar contents. Save named layouts or import and export layouts and themes.
+## Customize the dashboard
 
-Use Command-1 for Overview, Command-2 for Apps & processes, and Command-F for process search. See the [dashboard guide](docs/dashboard.md) for navigation and customization.
+Press `Command-,` to open Appearance. In **Layout & text**, drag sections into a new order, adjust their size, and edit dashboard copy. The other tabs control colors, fonts, chart history, refresh rate, and the menu bar.
 
-Theme files carry colors, font family, and text size. Layout files carry section order, visibility, width, chart height, labels, and descriptions. A locally selected font file stays local. Import a theme from [themes](themes/) to try the file format.
+Use `Command-1` for Overview, `Command-2` for Apps & processes, and `Command-F` for process search. The [dashboard guide](docs/dashboard.md) covers navigation and customization.
 
-Settings live in `~/Library/Application Support/Sysly/preferences.json`. Malformed settings fall back to defaults and are backed up before the next save. Set `SYSLY_CONFIG_DIR` to use an isolated configuration directory for verification.
+Try the [included themes](themes/), or export your own. Themes store colors, font family, and text size. Layouts store section order, visibility, widths, chart heights, labels, and descriptions. A selected local font file stays on your Mac.
 
-## Read the measurements
+Settings live at `~/Library/Application Support/Sysly/preferences.json`. If settings are malformed, Sysly uses defaults and backs up the original file before the next save. Set `SYSLY_CONFIG_DIR` to use a different settings directory.
 
-- Processor activity is the percentage of the Mac's total CPU capacity in use. Process activity is per core and can exceed 100%.
-- Graphics activity is GPU active residency, not a benchmark or a measure of rendering speed.
-- Memory use and available memory follow macOS counters. Available memory includes reclaimable memory and does not complement the used value. Memory use alone does not indicate memory pressure.
-- Network rates use actual elapsed time between samples. The first sample establishes a baseline. Interface totals are OS counters, not totals since Sysly opened.
-- APFS volumes can share physical disk I/O counters. Do not add their throughput together.
-- Temperatures, frequencies, fans, and power depend on the Mac and OS APIs. Missing readings remain unavailable. Power readings are estimates from the hardware source.
-- Process signals use your account's existing permissions. Sysly rechecks the process identity before signalling it and rejects its own process and PID 0/1.
+## Understand the readings
 
-The app targets Apple Silicon and macOS 14 or later. Hardware APIs come from [macmon](https://github.com/vladkens/macmon), including private Apple interfaces. Compatibility with every chip and macOS version requires separate verification.
+CPU activity shows the percentage of the Mac's total CPU capacity in use. Individual process CPU activity is per core and can exceed 100%. GPU activity measures active residency, not rendering speed.
 
-## Verify
+Memory readings follow macOS counters. Available memory includes reclaimable memory, so used and available memory do not add up to total memory. Memory use alone does not indicate memory pressure.
+
+Network rates use the actual time between samples. The first sample establishes a baseline. Interface totals come from macOS and do not start at zero when you open Sysly. APFS volumes can share physical disk I/O counters, so do not add their throughput together.
+
+Hardware readings depend on the Mac and macOS version. Power readings are estimates. Sysly uses [macmon](https://github.com/vladkens/macmon) for Apple Silicon hardware data, including private Apple interfaces. Support for every chip and macOS version needs separate verification.
+
+## Develop and verify
+
+Run the tests and lint checks:
 
 ```sh
 cargo test --locked
 cargo clippy --locked --all-targets -- -D warnings
+```
+
+Check the collectors against real macOS activity:
+
+```sh
 python3 scripts/verify_metrics.py
 ```
 
-The metric check compares memory and core counts with macOS, measures a real CPU workload, and checks a known loopback transfer. `target/release/sysly --sample 5 1` prints five real snapshots at one-second intervals. Snapshot output includes process commands, so treat it as local diagnostic data.
+The metric check compares memory and core counts with macOS, creates a CPU workload, and checks a known loopback transfer.
 
-Run `python3 scripts/verify_gpui.py PID` against an existing instance for native interaction checks. The script compiles the Swift window helper and Vision OCR helper. It requires macOS Accessibility and screen capture permissions. GPUI 0.2.2 does not expose content labels through Accessibility, so the check reads captured window text. Process signals target a disposable child created by the script.
+To print five JSON snapshots at one-second intervals, build the release binary and run:
 
-Native screenshots and review evidence live in [artifacts/redesign](artifacts/redesign/). `scripts/verify_ui.py` and `.impeccable/review` captures belong to the previous interface. `scripts/measure.py PID --mode visible` records resource observations after you establish the mode through the real UI.
+```sh
+cargo build --release --locked
+target/release/sysly --sample 5 1
+```
 
-See [architecture](docs/architecture.md) for ownership, scheduling, and data sources, and [verification](docs/verification.md) for verification results and limits.
+Snapshots include process commands. Treat them as local diagnostic data.
+
+For native interaction checks, run `python3 scripts/verify_gpui.py PID` against a running Sysly instance. The script needs macOS Accessibility and screen capture permissions. It compiles Swift helpers and reads captured window text with Vision OCR because GPUI 0.2.2 does not expose content labels through Accessibility. Process signal checks use a disposable child process.
+
+Read the [architecture guide](docs/architecture.md) for code ownership and data sources, or the [verification notes](docs/verification.md) for recorded results and limits.
+
+## License
+
+Sysly uses the [MIT license](LICENSE). The vendored macmon code carries its [own MIT license](vendor/macmon/LICENSE).
