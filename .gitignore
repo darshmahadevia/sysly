@@ -1,4 +1,5 @@
 /target/
 /dist/
+/artifacts/
 /.audit/
 /.impeccable/review/

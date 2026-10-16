@@ -8,8 +8,6 @@ A native system monitor for Apple Silicon Macs, built with Rust and GPUI.
 
 See what is using your Mac's resources, inspect individual processes, and arrange the dashboard around the readings you care about. Sysly keeps CPU and memory summaries in the menu bar when you close the window.
 
-![Sysly dashboard with memory, graphics, and network activity](artifacts/logo/dashboard.png)
-
 ## What you can do
 
 - Track CPU and per-core activity, GPU activity, memory, swap, disk I/O, network traffic, and battery status.
