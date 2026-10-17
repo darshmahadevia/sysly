@@ -1,10 +1,10 @@
 use crate::model::{
     Battery, Disk, Hardware, Memory, Network, Process, ProcessAction, ProcessKey, Snapshot,
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use sysinfo::{
-    DiskRefreshKind, Disks, Networks, Pid, ProcessRefreshKind, ProcessesToUpdate, System,
+    DiskRefreshKind, Disks, Networks, Pid, ProcessRefreshKind, ProcessesToUpdate, System, Uid,
     UpdateKind, Users,
 };
 
@@ -14,17 +14,14 @@ struct CounterRates<K> {
 }
 
 impl<K: Eq + std::hash::Hash> CounterRates<K> {
-    fn observe(&mut self, key: K, read: u64, write: u64, now: Instant) -> (f64, f64) {
-        let previous = self.previous.insert(key, (read, write, now));
-        let Some((old_read, old_write, before)) = previous else {
-            return (0.0, 0.0);
-        };
+    fn observe(&mut self, key: K, read: u64, write: u64, now: Instant) -> Option<(f64, f64)> {
+        let (old_read, old_write, before) = self.previous.insert(key, (read, write, now))?;
         let seconds = now.duration_since(before).as_secs_f64();
         if seconds <= 0.0 {
-            return (0.0, 0.0);
+            return Some((0.0, 0.0));
         }
         let rate = |current: u64, old| current.saturating_sub(old) as f64 / seconds;
-        (rate(read, old_read), rate(write, old_write))
+        Some((rate(read, old_read), rate(write, old_write)))
     }
 }
 
@@ -32,7 +29,7 @@ pub struct Collector {
     system: System,
     networks: Networks,
     disks: Disks,
-    users: Users,
+    users: HashMap<Uid, String>,
     sampler: Result<macmon::Sampler, String>,
     battery: Option<Battery>,
     battery_warning: Option<String>,
@@ -41,6 +38,7 @@ pub struct Collector {
     disk_rates: CounterRates<String>,
     started: Instant,
     slow_refresh: Option<Instant>,
+    users_refresh: Option<Instant>,
     sequence: u64,
 }
 
@@ -52,7 +50,7 @@ impl Collector {
             system,
             networks: Networks::new(),
             disks: Disks::new(),
-            users: Users::new(),
+            users: HashMap::new(),
             sampler: macmon::Sampler::new().map_err(|error| error.to_string()),
             battery: None,
             battery_warning: None,
@@ -61,13 +59,28 @@ impl Collector {
             disk_rates: CounterRates::default(),
             started: Instant::now(),
             slow_refresh: None,
+            users_refresh: None,
             sequence: 0,
         }
     }
 
     pub fn sample(&mut self, interval: Duration) -> Snapshot {
         let wait_started = Instant::now();
-        let hardware = match &mut self.sampler {
+        let hardware = self.sample_hardware(interval);
+        if let Some(remaining) = interval.checked_sub(wait_started.elapsed()) {
+            std::thread::sleep(remaining);
+        }
+        self.collect(hardware)
+    }
+
+    pub fn sample_now(&mut self) -> Snapshot {
+        // IOReport retains its baseline across the monitor's interruptible wait.
+        let hardware = self.sample_hardware(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
+        self.collect(hardware)
+    }
+
+    fn sample_hardware(&mut self, interval: Duration) -> Hardware {
+        match &mut self.sampler {
             Ok(sampler) => match sampler
                 .get_metrics(interval.as_millis().clamp(1, u32::MAX as u128) as u32)
             {
@@ -105,23 +118,32 @@ impl Collector {
                 status: format!("Hardware sampling unavailable: {error}"),
                 ..Hardware::default()
             },
-        };
-        if let Some(remaining) = interval.checked_sub(wait_started.elapsed()) {
-            std::thread::sleep(remaining);
         }
+    }
+
+    fn collect(&mut self, hardware: Hardware) -> Snapshot {
         let collecting = Instant::now();
         let slow = self
             .slow_refresh
             .is_none_or(|last| collecting.duration_since(last) >= Duration::from_secs(5));
         if slow {
             self.disks.refresh(true);
-            self.users.refresh();
             self.refresh_battery();
             self.slow_refresh = Some(collecting);
         } else {
             for disk in self.disks.list_mut() {
                 disk.refresh_specifics(DiskRefreshKind::nothing().with_io_usage());
             }
+        }
+        if self
+            .users_refresh
+            .is_none_or(|last| collecting.duration_since(last) >= Duration::from_secs(60))
+        {
+            self.users = Users::new_with_refreshed_list()
+                .iter()
+                .map(|user| (user.id().clone(), user.name().to_owned()))
+                .collect();
+            self.users_refresh = Some(collecting);
         }
         self.system.refresh_cpu_usage();
         self.system.refresh_memory();
@@ -143,12 +165,15 @@ impl Collector {
             .networks
             .iter()
             .map(|(name, network)| {
-                let (received_per_sec, sent_per_sec) = self.network_rates.observe(
-                    name.clone(),
-                    network.total_received(),
-                    network.total_transmitted(),
-                    now,
-                );
+                let (received_per_sec, sent_per_sec) = self
+                    .network_rates
+                    .observe(
+                        name.clone(),
+                        network.total_received(),
+                        network.total_transmitted(),
+                        now,
+                    )
+                    .unwrap_or_default();
                 Network {
                     name: name.clone(),
                     addresses: network
@@ -167,13 +192,9 @@ impl Collector {
                 }
             })
             .collect::<Vec<_>>();
-        let live_networks = networks
-            .iter()
-            .map(|network| network.name.as_str())
-            .collect::<HashSet<_>>();
         self.network_rates
             .previous
-            .retain(|name, _| live_networks.contains(name.as_str()));
+            .retain(|name, _| self.networks.contains_key(name));
         let disks = self
             .disks
             .iter()
@@ -182,12 +203,15 @@ impl Collector {
                 let io = disk.usage();
                 // sysinfo cannot distinguish unsupported IO counters from lifetime zero counters.
                 let available = io.total_read_bytes > 0 || io.total_written_bytes > 0;
-                let rates = self.disk_rates.observe(
-                    mount.clone(),
-                    io.total_read_bytes,
-                    io.total_written_bytes,
-                    now,
-                );
+                let rates = self
+                    .disk_rates
+                    .observe(
+                        mount.clone(),
+                        io.total_read_bytes,
+                        io.total_written_bytes,
+                        now,
+                    )
+                    .unwrap_or_default();
                 if !available {
                     warnings.push(format!("Disk IO counters unavailable for {mount}"));
                 }
@@ -213,13 +237,9 @@ impl Collector {
                     .into(),
             );
         }
-        let live_disks = disks
-            .iter()
-            .map(|disk| disk.mount.as_str())
-            .collect::<HashSet<_>>();
         self.disk_rates
             .previous
-            .retain(|mount, _| live_disks.contains(mount.as_str()));
+            .retain(|mount, _| disks.iter().any(|disk| &disk.mount == mount));
         let processes = self
             .system
             .processes()
@@ -231,28 +251,24 @@ impl Collector {
                 };
                 let io = process.disk_usage();
                 let identity = (key.pid, key.started_at);
-                let known = self.process_rates.previous.contains_key(&identity);
                 let rates = self.process_rates.observe(
                     identity,
                     io.total_read_bytes,
                     io.total_written_bytes,
                     now,
                 );
+                let known = rates.is_some();
+                let rates = rates.unwrap_or_default();
                 Process {
                     key,
                     parent: process.parent().map(|pid| pid.as_u32()),
                     name: process.name().to_string_lossy().into_owned(),
                     user: process
                         .user_id()
-                        .and_then(|id| self.users.get_user_by_id(id))
-                        .map(|user| user.name().to_owned())
+                        .and_then(|id| self.users.get(id))
+                        .cloned()
                         .unwrap_or_else(|| "Unknown".into()),
-                    command: process
-                        .cmd()
-                        .iter()
-                        .map(|part| part.to_string_lossy())
-                        .collect::<Vec<_>>()
-                        .join(" "),
+                    command: command_line(process.cmd()),
                     status: process.status().to_string(),
                     cpu_percent: if known { process.cpu_usage() } else { 0.0 },
                     memory: process.memory(),
@@ -263,13 +279,11 @@ impl Collector {
                 }
             })
             .collect::<Vec<_>>();
-        let live_processes = processes
-            .iter()
-            .map(|process| (process.key.pid, process.key.started_at))
-            .collect::<HashSet<_>>();
-        self.process_rates
-            .previous
-            .retain(|key, _| live_processes.contains(key));
+        self.process_rates.previous.retain(|(pid, started_at), _| {
+            self.system
+                .process(Pid::from_u32(*pid))
+                .is_some_and(|process| process.start_time() == *started_at)
+        });
         self.sequence += 1;
         let load = System::load_average();
         Snapshot {
@@ -319,6 +333,19 @@ impl Collector {
             }
         }
     }
+}
+
+fn command_line(parts: &[std::ffi::OsString]) -> String {
+    let capacity =
+        parts.iter().map(|part| part.len()).sum::<usize>() + parts.len().saturating_sub(1);
+    let mut command = String::with_capacity(capacity);
+    for (index, part) in parts.iter().enumerate() {
+        if index != 0 {
+            command.push(' ');
+        }
+        command.push_str(&part.to_string_lossy());
+    }
+    command
 }
 
 fn process_refresh() -> ProcessRefreshKind {
@@ -458,21 +485,88 @@ mod tests {
     use super::*;
 
     #[test]
+    fn command_line_preserves_argument_spacing_and_lossy_text() {
+        use std::{ffi::OsString, os::unix::ffi::OsStringExt};
+        assert_eq!(
+            command_line(&[
+                OsString::from("printf"),
+                OsString::from(""),
+                OsString::from("hello world"),
+                OsString::from_vec(vec![b'f', 0xff]),
+            ]),
+            "printf  hello world f�"
+        );
+        assert_eq!(command_line(&[]), "");
+    }
+
+    #[test]
+    fn samples_preserve_commands_and_reuse_user_names_until_refresh() {
+        let mut child = std::process::Command::new("/bin/sleep")
+            .arg("30")
+            .spawn()
+            .unwrap();
+        let mut collector = Collector::new();
+        let first = collector.sample_now();
+        let row = first
+            .processes
+            .iter()
+            .find(|process| process.key.pid == child.id())
+            .unwrap();
+        assert_eq!(row.command, "/bin/sleep 30");
+        assert_eq!(
+            (row.cpu_percent, row.read_per_sec, row.write_per_sec),
+            (0.0, 0.0, 0.0)
+        );
+        let owner = collector
+            .system
+            .process(Pid::from_u32(child.id()))
+            .unwrap()
+            .user_id()
+            .unwrap()
+            .clone();
+        collector.users.insert(owner, "Cached user".into());
+        let second = collector.sample_now();
+        let row = second
+            .processes
+            .iter()
+            .find(|process| process.key.pid == child.id())
+            .unwrap();
+        assert_eq!(row.user, "Cached user");
+        assert_eq!(row.command, "/bin/sleep 30");
+        child.kill().unwrap();
+        child.wait().unwrap();
+        let third = collector.sample_now();
+        assert!(
+            third
+                .processes
+                .iter()
+                .all(|process| process.key.pid != child.id())
+        );
+        assert!(
+            collector
+                .process_rates
+                .previous
+                .keys()
+                .all(|(pid, _)| *pid != child.id())
+        );
+    }
+
+    #[test]
     fn rates_use_elapsed_time_and_reset_baselines() {
         let mut rates = CounterRates::default();
         let now = Instant::now();
-        assert_eq!(rates.observe("en0", 100, 200, now), (0.0, 0.0));
+        assert_eq!(rates.observe("en0", 100, 200, now), None);
         assert_eq!(
             rates.observe("en0", 300, 500, now + Duration::from_secs(2)),
-            (100.0, 150.0)
+            Some((100.0, 150.0))
         );
         assert_eq!(
             rates.observe("en0", 10, 20, now + Duration::from_secs(3)),
-            (0.0, 0.0)
+            Some((0.0, 0.0))
         );
         assert_eq!(
             rates.observe("en0", 30, 50, now + Duration::from_secs(4)),
-            (20.0, 30.0)
+            Some((20.0, 30.0))
         );
     }
 

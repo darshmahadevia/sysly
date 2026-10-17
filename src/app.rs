@@ -75,7 +75,7 @@ struct History {
     gpu: Option<f32>,
     received: Option<f64>,
     sent: Option<f64>,
-    cores: Vec<f32>,
+    cores: Arc<[f32]>,
     swap: f32,
     break_before: bool,
 }
@@ -109,7 +109,11 @@ impl GraphTimeline {
         .min(1.);
         self.from + (self.to - self.from) * progress
     }
-    fn advance_to(&mut self, time: f64, interval: f64, now: Instant) {
+    fn advance_to(&mut self, time: f64, interval: f64, smooth: bool, now: Instant) {
+        if !smooth {
+            self.snap(time, now);
+            return;
+        }
         self.from = self.end_at(now);
         self.to = time;
         self.started = now;
@@ -153,7 +157,7 @@ pub struct App {
     monitor: Monitor,
     tray: Option<Tray>,
     snapshot: Arc<Snapshot>,
-    history: VecDeque<History>,
+    history: Arc<VecDeque<History>>,
     graph_timeline: GraphTimeline,
     graph_viewport: TraceViewport,
     preferences: Preferences,
@@ -170,6 +174,7 @@ pub struct App {
     descending: bool,
     tree: bool,
     process_rows: Vec<(usize, usize)>,
+    top_processes: [Option<usize>; 5],
     focus: FocusHandle,
     resize: Option<Resize>,
     font_family: SharedString,
@@ -190,7 +195,7 @@ impl App {
             monitor,
             tray,
             snapshot: Arc::default(),
-            history: VecDeque::with_capacity(902),
+            history: Arc::new(VecDeque::new()),
             graph_timeline: GraphTimeline::new(Instant::now()),
             graph_viewport: TraceViewport {
                 end: 0.,
@@ -210,6 +215,7 @@ impl App {
             descending: true,
             tree: false,
             process_rows: vec![],
+            top_processes: [None; 5],
             focus: cx.focus_handle(),
             resize: None,
             font_family: ".AppleSystemUIFont".into(),
@@ -471,21 +477,23 @@ impl App {
                     self.graph_timeline.advance_to(
                         next.elapsed_secs,
                         next.elapsed_secs - self.snapshot.elapsed_secs,
+                        self.preferences.smooth_charts,
                         now,
                     );
                 }
             }
-            self.history.push_back(History {
+            Arc::make_mut(&mut self.history).push_back(History {
                 time: next.elapsed_secs,
                 cpu: next.cpu_percent,
                 memory: ratio(next.memory.used, next.memory.total),
                 gpu: next.hardware.gpu_percent,
                 received,
                 sent,
-                cores: next.cores.clone(),
+                cores: next.cores.as_slice().into(),
                 swap: ratio(next.memory.swap_used, next.memory.swap_total),
                 break_before: gap,
             });
+            self.top_processes = top_processes(&next.processes);
             self.snapshot = next;
             self.trim_history();
             self.update_process_rows(cx);
@@ -513,7 +521,7 @@ impl App {
             self.graph_timeline.end_at(Instant::now()) - self.preferences.history_secs as f64;
         while self.history.len() > 902 || (self.history.len() > 2 && self.history[1].time < cutoff)
         {
-            self.history.pop_front();
+            Arc::make_mut(&mut self.history).pop_front();
         }
     }
     fn toggle_pause(&mut self, cx: &mut Context<Self>) {
@@ -525,6 +533,10 @@ impl App {
         cx.notify();
     }
     fn update_process_rows(&mut self, cx: &gpui::App) {
+        if self.page != Page::Processes {
+            self.process_rows.clear();
+            return;
+        }
         let query = self
             .inputs
             .get(&Edit::Search)
@@ -543,6 +555,7 @@ impl App {
             self.transition += 1;
         }
         self.page = page;
+        self.update_process_rows(cx);
         self.needs_focus = true;
         self.overlay = None;
         cx.notify();
@@ -977,11 +990,6 @@ impl App {
                 if detailed {
                     let mut core_history = div().flex().flex_wrap().gap_3().mt_5();
                     for (index, value) in self.snapshot.cores.iter().enumerate() {
-                        let values = self
-                            .history
-                            .iter()
-                            .map(|h| (h.time, h.cores.get(index).copied(), h.break_before))
-                            .collect();
                         core_history = core_history.child(
                             div()
                                 .w(relative(0.23))
@@ -993,7 +1001,8 @@ impl App {
                                         .child(label(format!("{value:.1}%"), accent)),
                                 )
                                 .child(trace(
-                                    values,
+                                    self.history.clone(),
+                                    TraceSeries::Core(index),
                                     100.,
                                     self.graph_viewport,
                                     accent,
@@ -1073,10 +1082,8 @@ impl App {
                 if detailed {
                     card = card
                         .child(trace(
-                            self.history
-                                .iter()
-                                .map(|h| (h.time, Some(h.swap), h.break_before))
-                                .collect(),
+                            self.history.clone(),
+                            TraceSeries::Swap,
                             100.,
                             self.graph_viewport,
                             color(t.accent),
@@ -1182,7 +1189,7 @@ impl App {
                                 move |this, _, _, cx| {
                                     this.interface = name.clone();
                                     this.update_tray();
-                                    for history in &mut this.history {
+                                    for history in Arc::make_mut(&mut this.history) {
                                         history.received = None;
                                         history.sent = None;
                                     }
@@ -1339,9 +1346,8 @@ impl App {
                 }
             }
             SectionKind::Processes => {
-                let mut processes: Vec<_> = self.snapshot.processes.iter().collect();
-                processes.sort_by(|a, b| b.cpu_percent.total_cmp(&a.cpu_percent));
-                for process in processes.iter().take(5) {
+                for &index in self.top_processes.iter().flatten() {
+                    let process = &self.snapshot.processes[index];
                     let key = process.key;
                     card = card.child(
                         div()
@@ -1468,29 +1474,18 @@ impl App {
                         }
                         let series = if kind == SectionKind::Network { 2 } else { 1 };
                         for series_index in 0..series {
-                            let values: Vec<_> = history
-                                .iter()
-                                .map(|h| {
-                                    let value = match kind {
-                                        SectionKind::Processor => Some(h.cpu),
-                                        SectionKind::Memory => Some(h.memory),
-                                        SectionKind::Graphics => h.gpu,
-                                        SectionKind::Network => {
-                                            if series_index == 0 {
-                                                h.received.map(|v| v as f32)
-                                            } else {
-                                                h.sent.map(|v| v as f32)
-                                            }
-                                        }
-                                        _ => None,
-                                    };
-                                    (h.time, value, h.break_before)
-                                })
-                                .collect();
+                            let series = match kind {
+                                SectionKind::Processor => TraceSeries::Cpu,
+                                SectionKind::Memory => TraceSeries::Memory,
+                                SectionKind::Graphics => TraceSeries::Gpu,
+                                SectionKind::Network if series_index == 0 => TraceSeries::Received,
+                                SectionKind::Network => TraceSeries::Sent,
+                                _ => continue,
+                            };
                             paint_trace(
                                 window,
                                 bounds,
-                                &values,
+                                history.iter().map(|h| series.sample(h)),
                                 max as f32,
                                 viewport,
                                 if series_index == 0 { accent } else { secondary },
@@ -2096,6 +2091,26 @@ impl App {
                         t,
                     ));
                 }
+                page = page
+                    .child(setting_row(
+                        "Smooth chart scrolling",
+                        self.toggle("smooth-charts", self.preferences.smooth_charts)
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.preferences.smooth_charts = !this.preferences.smooth_charts;
+                                if !this.preferences.smooth_charts {
+                                    this.graph_timeline
+                                        .snap(this.graph_timeline.to, Instant::now());
+                                }
+                                this.save(cx);
+                            })),
+                        t,
+                    ))
+                    .child(
+                        div()
+                            .text_size(px(12.))
+                            .text_color(color(t.muted))
+                            .child("Off updates charts on each sample and uses less CPU."),
+                    );
                 page = page.child(setting_row(
                     "Density",
                     div()
@@ -2586,7 +2601,12 @@ impl Render for App {
             ),
             _ => false,
         };
-        if !self.hidden && !self.paused && graph_page && self.graph_timeline.is_moving(now) {
+        if self.preferences.smooth_charts
+            && !self.hidden
+            && !self.paused
+            && graph_page
+            && self.graph_timeline.is_moving(now)
+        {
             window.request_animation_frame();
         }
         if self.needs_focus {
@@ -2942,12 +2962,19 @@ fn process_rows(
             || p.user.to_lowercase().contains(&query)
             || p.key.pid.to_string().contains(&query)
     };
+    let names = (sort == Sort::Name).then(|| {
+        processes
+            .iter()
+            .map(|p| p.name.to_lowercase())
+            .collect::<Vec<_>>()
+    });
     let compare = |a: &usize, b: &usize| {
+        let name_order = names.as_ref().map(|names| names[*a].cmp(&names[*b]));
         let (a, b) = (&processes[*a], &processes[*b]);
         let order = match sort {
             Sort::Cpu => a.cpu_percent.total_cmp(&b.cpu_percent),
             Sort::Memory => a.memory.cmp(&b.memory),
-            Sort::Name => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+            Sort::Name => name_order.unwrap(),
             Sort::Pid => a.key.pid.cmp(&b.key.pid),
             Sort::Io => {
                 (a.read_per_sec + a.write_per_sec).total_cmp(&(b.read_per_sec + b.write_per_sec))
@@ -2956,11 +2983,12 @@ fn process_rows(
         (if descending { order.reverse() } else { order }).then(a.key.pid.cmp(&b.key.pid))
     };
     if !tree {
-        let mut indices: Vec<_> = (0..processes.len())
+        let mut rows: Vec<_> = (0..processes.len())
             .filter(|&i| matches(&processes[i]))
+            .map(|i| (i, 0))
             .collect();
-        indices.sort_by(compare);
-        return indices.into_iter().map(|i| (i, 0)).collect();
+        rows.sort_unstable_by(|a, b| compare(&a.0, &b.0));
+        return rows;
     }
     let by_pid: HashMap<_, _> = processes
         .iter()
@@ -2968,20 +2996,15 @@ fn process_rows(
         .map(|(i, p)| (p.key.pid, i))
         .collect();
     let mut keep = HashSet::new();
-    for (i, p) in processes.iter().enumerate().filter(|(_, p)| matches(p)) {
-        keep.insert(i);
-        let mut parent = p.parent;
-        let mut seen = HashSet::new();
-        while let Some(pid) = parent {
-            if !seen.insert(pid) {
+    for (i, _) in processes.iter().enumerate().filter(|(_, p)| matches(p)) {
+        let mut current = Some(i);
+        while let Some(index) = current {
+            if !keep.insert(index) {
                 break;
             }
-            if let Some(&index) = by_pid.get(&pid) {
-                keep.insert(index);
-                parent = processes[index].parent;
-            } else {
-                break;
-            }
+            current = processes[index]
+                .parent
+                .and_then(|pid| by_pid.get(&pid).copied());
         }
     }
     let mut children: HashMap<Option<u32>, Vec<usize>> = HashMap::new();
@@ -2992,7 +3015,7 @@ fn process_rows(
         children.entry(parent).or_default().push(i);
     }
     for siblings in children.values_mut() {
-        siblings.sort_by(compare);
+        siblings.sort_unstable_by(compare);
     }
     let mut rows = Vec::with_capacity(keep.len());
     let mut visited = HashSet::new();
@@ -3020,7 +3043,7 @@ fn process_rows(
         }
     }
     let mut remainder: Vec<_> = keep.into_iter().filter(|i| !visited.contains(i)).collect();
-    remainder.sort_by(compare);
+    remainder.sort_unstable_by(compare);
     for i in remainder {
         walk(i, 0, processes, &children, &mut visited, &mut rows);
     }
@@ -3035,7 +3058,8 @@ impl Drop for App {
     }
 }
 fn trace(
-    values: Vec<(f64, Option<f32>, bool)>,
+    history: Arc<VecDeque<History>>,
+    series: TraceSeries,
     maximum: f32,
     viewport: TraceViewport,
     accent: Hsla,
@@ -3051,7 +3075,15 @@ fn trace(
             if let Ok(path) = base.build() {
                 window.paint_path(path, grid);
             }
-            paint_trace(window, bounds, &values, maximum, viewport, accent, 1.5);
+            paint_trace(
+                window,
+                bounds,
+                history.iter().map(|h| series.sample(h)),
+                maximum,
+                viewport,
+                accent,
+                1.5,
+            );
         },
     )
     .w_full()
@@ -3098,110 +3130,149 @@ fn move_section(preferences: &mut Preferences, source: SectionKind, before: Opti
         preferences.sections.insert(target, section);
     }
 }
-fn trace_segments(values: &[(f64, Option<f32>, bool)]) -> Vec<Vec<(f64, f32)>> {
-    let mut segments: Vec<Vec<(f64, f32)>> = Vec::new();
-    let mut current = Vec::new();
-    for &(time, value, gap) in values {
-        if (gap || value.is_none()) && !current.is_empty() {
-            segments.push(std::mem::take(&mut current));
-        }
-        if let Some(value) = value {
-            current.push((time, value));
-        }
-    }
-    if !current.is_empty() {
-        segments.push(current);
-    }
-    segments
+#[derive(Clone, Copy)]
+enum TraceSeries {
+    Cpu,
+    Memory,
+    Gpu,
+    Received,
+    Sent,
+    Core(usize),
+    Swap,
 }
-fn clipped_trace_segments(
-    values: &[(f64, Option<f32>, bool)],
+impl TraceSeries {
+    fn sample(self, history: &History) -> (f64, Option<f32>, bool) {
+        let value = match self {
+            Self::Cpu => Some(history.cpu),
+            Self::Memory => Some(history.memory),
+            Self::Gpu => history.gpu,
+            Self::Received => history.received.map(|v| v as f32),
+            Self::Sent => history.sent.map(|v| v as f32),
+            Self::Core(index) => history.cores.get(index).copied(),
+            Self::Swap => Some(history.swap),
+        };
+        (history.time, value, history.break_before)
+    }
+}
+
+fn for_each_clipped_trace_point(
+    values: impl IntoIterator<Item = (f64, Option<f32>, bool)>,
     viewport: TraceViewport,
-) -> Vec<Vec<(f64, f32)>> {
+    mut visit: impl FnMut(bool, (f64, f32)),
+) {
     let left = viewport.end - viewport.span;
-    let mut clipped = Vec::new();
-    for segment in trace_segments(values) {
-        let mut visible = Vec::new();
-        if segment.len() == 1 {
-            if segment[0].0 >= left && segment[0].0 <= viewport.end {
-                visible.push(segment[0]);
+    let mut previous: Option<(f64, f32)> = None;
+    let mut has_pair = false;
+    let mut last_visible = None;
+    for (time, value, gap) in values.into_iter().chain([(0., None, false)]) {
+        if gap || value.is_none() {
+            if !has_pair
+                && let Some(point) = previous
+                && point.0 >= left
+                && point.0 <= viewport.end
+            {
+                visit(true, point);
             }
-        } else {
-            for pair in segment.windows(2) {
-                let (start, end) = (pair[0], pair[1]);
-                if end.0 < left || start.0 > viewport.end || end.0 <= start.0 {
-                    continue;
-                }
+            previous = None;
+            has_pair = false;
+            last_visible = None;
+        }
+        let Some(value) = value else { continue };
+        let end = (time, value);
+        if let Some(start) = previous {
+            has_pair = true;
+            if end.0 >= left && start.0 <= viewport.end && end.0 > start.0 {
                 let interpolate = |time: f64| {
                     (
                         time,
                         start.1 + (end.1 - start.1) * ((time - start.0) / (end.0 - start.0)) as f32,
                     )
                 };
-                let start = interpolate(start.0.max(left));
-                let end = interpolate(end.0.min(viewport.end));
-                if visible.last() != Some(&start) {
-                    visible.push(start);
-                }
-                if visible.last() != Some(&end) {
-                    visible.push(end);
+                for point in [
+                    interpolate(start.0.max(left)),
+                    interpolate(end.0.min(viewport.end)),
+                ] {
+                    if last_visible != Some(point) {
+                        visit(last_visible.is_none(), point);
+                        last_visible = Some(point);
+                    }
                 }
             }
         }
-        if !visible.is_empty() {
-            clipped.push(visible);
-        }
+        previous = Some(end);
     }
-    clipped
+}
+
+#[cfg(test)]
+fn clipped_trace_segments(
+    values: &[(f64, Option<f32>, bool)],
+    viewport: TraceViewport,
+) -> Vec<Vec<(f64, f32)>> {
+    let mut segments: Vec<Vec<(f64, f32)>> = Vec::new();
+    for_each_clipped_trace_point(values.iter().copied(), viewport, |start, point| {
+        if start {
+            segments.push(Vec::new());
+        }
+        segments.last_mut().unwrap().push(point);
+    });
+    segments
 }
 
 fn network_maximum(history: &VecDeque<History>, viewport: TraceViewport) -> f64 {
-    [true, false]
-        .into_iter()
-        .flat_map(|received| {
-            let values: Vec<_> = history
-                .iter()
-                .map(|h| {
-                    (
-                        h.time,
-                        if received { h.received } else { h.sent }.map(|v| v as f32),
-                        h.break_before,
-                    )
-                })
-                .collect();
-            clipped_trace_segments(&values, viewport)
-                .into_iter()
-                .flatten()
-                .map(|(_, value)| value as f64)
-        })
-        .fold(1024., f64::max)
+    let mut maximum = 1024.;
+    for series in [TraceSeries::Received, TraceSeries::Sent] {
+        for_each_clipped_trace_point(
+            history.iter().map(|h| series.sample(h)),
+            viewport,
+            |_, (_, value)| {
+                maximum = f64::max(maximum, value as f64);
+            },
+        );
+    }
+    maximum
+}
+
+fn top_processes(processes: &[Process]) -> [Option<usize>; 5] {
+    let mut top: [Option<usize>; 5] = [None; 5];
+    for (index, process) in processes.iter().enumerate() {
+        if let Some(position) = top.iter().position(|existing| {
+            existing.is_none_or(|existing| {
+                process
+                    .cpu_percent
+                    .total_cmp(&processes[existing].cpu_percent)
+                    .is_gt()
+            })
+        }) {
+            top[position..].rotate_right(1);
+            top[position] = Some(index);
+        }
+    }
+    top
 }
 
 fn paint_trace(
     window: &mut Window,
     bounds: Bounds<Pixels>,
-    values: &[(f64, Option<f32>, bool)],
+    values: impl IntoIterator<Item = (f64, Option<f32>, bool)>,
     maximum: f32,
     viewport: TraceViewport,
     accent: Hsla,
     width: f32,
 ) {
     let mut line = PathBuilder::stroke(px(width));
-    for segment in clipped_trace_segments(values, viewport) {
-        for (index, (time, value)) in segment.into_iter().enumerate() {
-            let point = point(
-                bounds.left()
-                    + bounds.size.width
-                        * ((time - viewport.end + viewport.span) / viewport.span) as f32,
-                bounds.bottom() - bounds.size.height * (value / maximum).clamp(0., 1.),
-            );
-            if index == 0 {
-                line.move_to(point);
-            } else {
-                line.line_to(point);
-            }
+    for_each_clipped_trace_point(values, viewport, |start, (time, value)| {
+        let point = point(
+            bounds.left()
+                + bounds.size.width
+                    * ((time - viewport.end + viewport.span) / viewport.span) as f32,
+            bounds.bottom() - bounds.size.height * (value / maximum).clamp(0., 1.),
+        );
+        if start {
+            line.move_to(point);
+        } else {
+            line.line_to(point);
         }
-    }
+    });
     if let Ok(path) = line.build() {
         window.paint_path(path, accent);
     }
@@ -3232,12 +3303,12 @@ mod tests {
         let now = Instant::now();
         let mut timeline = GraphTimeline::new(now);
         timeline.snap(10., now);
-        timeline.advance_to(12., 2., now);
+        timeline.advance_to(12., 2., true, now);
         assert_eq!(timeline.end_at(now), 10.);
         assert_eq!(timeline.end_at(now + Duration::from_millis(500)), 10.5);
         let next = now + Duration::from_secs(1);
         assert_eq!(timeline.end_at(next), 11.);
-        timeline.advance_to(13., 1., next);
+        timeline.advance_to(13., 1., true, next);
         assert_eq!(timeline.end_at(next), 11.);
         assert_eq!(timeline.end_at(next + Duration::from_millis(500)), 12.);
         assert_eq!(timeline.end_at(next + Duration::from_secs(2)), 13.);
@@ -3249,14 +3320,42 @@ mod tests {
         let now = Instant::now();
         let mut timeline = GraphTimeline::new(now);
         timeline.snap(10., now);
-        timeline.advance_to(12., 2., now);
+        timeline.advance_to(12., 2., true, now);
         timeline.freeze(now + Duration::from_secs(1));
         assert_eq!(timeline.end_at(now + Duration::from_secs(30)), 11.);
         assert!(!timeline.is_moving(now + Duration::from_secs(30)));
         timeline.snap(40., now + Duration::from_secs(30));
         assert_eq!(timeline.end_at(now + Duration::from_secs(30)), 40.);
-        timeline.advance_to(42., 2., now + Duration::from_secs(32));
+        timeline.advance_to(42., 2., true, now + Duration::from_secs(32));
         assert_eq!(timeline.end_at(now + Duration::from_secs(33)), 41.);
+    }
+
+    #[test]
+    fn sample_updates_stay_fixed_and_smoothing_resumes_from_latest_sample() {
+        let now = Instant::now();
+        let mut timeline = GraphTimeline::new(now);
+        timeline.snap(10., now);
+        timeline.advance_to(12., 2., false, now);
+        assert_eq!(timeline.end_at(now), 12.);
+        assert_eq!(timeline.end_at(now + Duration::from_secs(1)), 12.);
+        assert!(!timeline.is_moving(now));
+
+        let next = now + Duration::from_secs(2);
+        timeline.advance_to(14., 2., true, next);
+        assert_eq!(timeline.end_at(next), 12.);
+        assert_eq!(timeline.end_at(next + Duration::from_secs(1)), 13.);
+        // Disabling smoothing completes an in-progress shift, rather than freezing it.
+        let disabled = next + Duration::from_secs(1);
+        timeline.snap(timeline.to, disabled);
+        assert_eq!(timeline.end_at(disabled), 14.);
+        assert!(!timeline.is_moving(disabled));
+        timeline.advance_to(16., 2., false, next + Duration::from_secs(2));
+        assert_eq!(timeline.end_at(next + Duration::from_secs(3)), 16.);
+
+        let resumed = next + Duration::from_secs(4);
+        timeline.advance_to(18., 2., true, resumed);
+        assert_eq!(timeline.end_at(resumed), 16.);
+        assert_eq!(timeline.end_at(resumed + Duration::from_secs(1)), 17.);
     }
 
     #[test]
@@ -3353,7 +3452,7 @@ mod tests {
                 gpu: None,
                 received: Some(received),
                 sent: Some(sent),
-                cores: vec![],
+                cores: Arc::default(),
                 swap: 0.,
                 break_before: false,
             })
@@ -3379,6 +3478,102 @@ mod tests {
         assert_eq!(
             network_maximum(&history, TraceViewport { end: 20., span: 5. }),
             4096.
+        );
+    }
+
+    #[test]
+    fn process_summary_keeps_five_busiest_in_stable_order() {
+        let processes = vec![
+            process(1, None, "idle", 0.),
+            process(2, None, "first busy", 90.),
+            process(3, None, "middle", 20.),
+            process(4, None, "second busy", 90.),
+            process(5, None, "third busy", 80.),
+            process(6, None, "fourth busy", 70.),
+            process(7, None, "fifth busy", 60.),
+        ];
+        assert_eq!(
+            top_processes(&processes),
+            [Some(1), Some(3), Some(4), Some(5), Some(6)]
+        );
+        assert_eq!(
+            top_processes(&processes[..2]),
+            [Some(1), Some(0), None, None, None]
+        );
+    }
+
+    #[test]
+    fn name_sort_and_search_preserve_unicode_case_and_pid_ties() {
+        let mut processes = vec![
+            process(30, None, "Éclair", 0.),
+            process(20, None, "alpha", 0.),
+            process(10, None, "ALPHA", 0.),
+        ];
+        processes[0].user = "Åsa".into();
+        assert_eq!(
+            process_rows(&processes, "", Sort::Name, false, false),
+            vec![(2, 0), (1, 0), (0, 0)]
+        );
+        assert_eq!(
+            process_rows(&processes, "", Sort::Name, true, false),
+            vec![(0, 0), (2, 0), (1, 0)]
+        );
+        assert_eq!(
+            process_rows(&processes, "åS", Sort::Name, false, false),
+            vec![(0, 0)]
+        );
+        assert_eq!(
+            process_rows(&processes, "éC", Sort::Name, false, false),
+            vec![(0, 0)]
+        );
+    }
+
+    #[test]
+    fn shared_history_keeps_a_render_frame_consistent_during_collection() {
+        let mut history = Arc::new(VecDeque::from([History {
+            time: 1.,
+            cpu: 25.,
+            memory: 50.,
+            gpu: None,
+            received: Some(2048.),
+            sent: None,
+            cores: Arc::from([10., 40.]),
+            swap: 5.,
+            break_before: false,
+        }]));
+        let frame = history.clone();
+        let mut next = history[0].clone();
+        next.time = 2.;
+        next.cpu = 75.;
+        Arc::make_mut(&mut history).push_back(next);
+        assert_eq!(frame.len(), 1);
+        assert_eq!(history.len(), 2);
+        assert_eq!(TraceSeries::Cpu.sample(&frame[0]), (1., Some(25.), false));
+        assert_eq!(TraceSeries::Cpu.sample(&history[1]), (2., Some(75.), false));
+        assert_eq!(
+            TraceSeries::Core(1).sample(&frame[0]),
+            (1., Some(40.), false)
+        );
+        assert_eq!(TraceSeries::Core(2).sample(&frame[0]), (1., None, false));
+        assert!(Arc::ptr_eq(&frame[0].cores, &history[0].cores));
+    }
+
+    #[test]
+    fn clipped_trace_preserves_singletons_and_duplicate_time_samples() {
+        assert_eq!(
+            clipped_trace_segments(
+                &[
+                    (0., None, false),
+                    (1., Some(10.), false),
+                    (1., Some(20.), false),
+                    (2., Some(40.), false),
+                    (3., Some(60.), true),
+                    (4., None, false),
+                    (5., Some(80.), true),
+                ],
+                TraceViewport { end: 5., span: 4. }
+            ),
+            vec![vec![(1., 20.), (2., 40.)], vec![(3., 60.)], vec![(5., 80.)],]
         );
     }
 
@@ -3418,14 +3613,17 @@ mod tests {
     #[test]
     fn trace_leaves_gaps_for_pauses_and_unavailable_telemetry() {
         assert_eq!(
-            trace_segments(&[
-                (0., Some(25.), false),
-                (1., Some(50.), false),
-                (2., Some(75.), true),
-                (3., Some(90.), false),
-                (4., None, false),
-                (5., Some(10.), false)
-            ]),
+            clipped_trace_segments(
+                &[
+                    (0., Some(25.), false),
+                    (1., Some(50.), false),
+                    (2., Some(75.), true),
+                    (3., Some(90.), false),
+                    (4., None, false),
+                    (5., Some(10.), false)
+                ],
+                TraceViewport { end: 5., span: 5. }
+            ),
             vec![
                 vec![(0., 25.), (1., 50.)],
                 vec![(2., 75.), (3., 90.)],

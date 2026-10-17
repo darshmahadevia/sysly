@@ -23,8 +23,8 @@ for index in range(20):
     with Image.open(path) as source:
         width, height = source.size
         box = tuple(round(value) for value in (
-            width * 262 / 1320, height * 290 / 901,
-            width * 731 / 1320, height * 418 / 901,
+            width * 262 / 1320, height * 200 / 901,
+            width * 731 / 1320, height * 590 / 901,
         ))
         image = source.convert('RGB').crop(box)
         mask = Image.new('1', image.size)

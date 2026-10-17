@@ -8,7 +8,9 @@ Sysly uses Rust GPUI 0.2.2 with gpui-component 0.5.1 and a native AppKit-backed 
 
 `app.rs` has one root `App` entity. The root owns the monitor, current `Arc<Snapshot>`, bounded history, preferences, store, tray, selected page, and typed process overlay. Stateless render functions compose cards and charts. Dedicated `InputState` entities own text editing and focus. The process list uses GPUI's virtualized `uniform_list`.
 
-The root polls monitor and tray events every 200 milliseconds. A new snapshot updates history and process ordering. History retains at most 901 samples and also respects the configured time span. Pauses mark a break before the next point. Missing values split traces rather than becoming zero. Navigation has a 180-millisecond opacity transition.
+The root polls monitor and tray events every 200 milliseconds. A new snapshot updates history and the five-process overview summary. The process page builds its row index when open. History retains at most 902 samples and also respects the configured time span. Render closures share history through an `Arc`; per-core arrays are shared across copy-on-write history updates. Charts stream clipped points directly into their paths. Pauses mark a break before the next point. Missing values split traces rather than becoming zero.
+
+Charts update on samples by default. The optional `smooth_charts` setting interpolates the viewport and requests animation frames between samples. GPUI 0.2.2 propagates view invalidation to ancestors, so continuous chart scrolling also rebuilds the dashboard. Sample-driven charts avoid that work. Navigation retains its 180-millisecond opacity transition.
 
 The section vector is the source of order, visibility, width, chart height, and custom copy. Stable section IDs support drag ordering. Named layouts snapshot that vector. Appearance settings update the component theme and schedule a save after 400 milliseconds. The store also saves on root drop.
 
@@ -16,13 +18,13 @@ The section vector is the source of order, visibility, width, chart height, and 
 
 `model.rs` defines snapshots without UI or OS handle types. `collector.rs` owns OS handles and cumulative counter baselines. `monitor.rs` owns a sampler worker and a separate process-action worker. The sampler replaces one latest snapshot rather than queuing a history backlog. The action channel has a capacity of eight.
 
-Pausing prevents publication of an in-flight sample and puts the sampler to sleep. A hidden window increases the sampling interval to at least five seconds. Process actions remain independent of hardware sampling waits. `tray.rs` sends menu events to the same UI root.
+Pausing prevents publication of an in-flight sample and puts the sampler to sleep. A hidden window increases the sampling interval to at least five seconds. The worker waits on a condition variable between samples so policy changes interrupt the wait. `Collector::sample_now` uses macmon's retained IOReport baseline across those waits. The CLI retains its blocking `sample(interval)` interface. Process actions remain independent of hardware sampling waits. `tray.rs` sends menu events to the same UI root.
 
 Process identity includes PID and start time. The signal boundary refreshes the process before sending TERM, KILL, STOP, or CONT. macOS has no atomic PID-plus-start-time signal API. A narrow exit and PID-reuse race remains between the final check and `kill`.
 
 ## Data and persistence
 
-Data sources are sysinfo for CPU, memory, processes, networks, and disks, macmon for Apple Silicon hardware metrics, and native IOKit for battery properties. Battery, user, and disk topology refresh less often than activity counters. Rates use monotonic observation time and counter identity. A reset establishes a fresh baseline.
+Data sources are sysinfo for CPU, memory, processes, networks, and disks, macmon for Apple Silicon hardware metrics, and native IOKit for battery properties. Battery and disk topology refresh every five seconds. User names are indexed by UID and refreshed every 60 seconds. Rates use monotonic observation time and counter identity. A reset establishes a fresh baseline.
 
 `Snapshot.collected_ms` measures post-hardware OS collection. It excludes macmon processing and its sampling wait. It does not measure total application overhead.
 

@@ -202,6 +202,7 @@ pub struct Preferences {
     pub theme: Theme,
     pub density: Density,
     pub refresh_secs: u64,
+    pub smooth_charts: bool,
     pub history_secs: u32,
     pub sections: Vec<SectionConfig>,
     pub saved_layouts: Vec<NamedLayout>,
@@ -217,6 +218,7 @@ impl Default for Preferences {
             theme: Theme::default(),
             density: Density::default(),
             refresh_secs: 2,
+            smooth_charts: false,
             history_secs: 240,
             sections: default_sections(),
             saved_layouts: Vec::new(),
@@ -599,6 +601,29 @@ mod tests {
         let layout_path = temp.0.join("layout.json");
         export_layout(&layout_path, &preferences.sections).unwrap();
         assert_eq!(import_layout(&layout_path).unwrap(), preferences.sections);
+    }
+    #[test]
+    fn version_one_defaults_to_sample_updates_and_persists_smoothing() {
+        let temp = Temp::new();
+        let path = temp.0.join("preferences.json");
+        let store = Store::at(path.clone());
+        let mut legacy = serde_json::to_value(Preferences::default()).unwrap();
+        legacy.as_object_mut().unwrap().remove("smooth_charts");
+        fs::write(&path, serde_json::to_vec(&legacy).unwrap()).unwrap();
+
+        let (mut preferences, notice) = store.load();
+        assert_eq!(notice, None);
+        assert_eq!(preferences.version, 1);
+        assert!(!preferences.smooth_charts);
+        for enabled in [true, false] {
+            preferences.smooth_charts = enabled;
+            store.save(&preferences).unwrap();
+            assert_eq!(store.load(), (preferences.clone(), None));
+            let stored: serde_json::Value =
+                serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+            assert_eq!(stored["version"], 1);
+            assert_eq!(stored["smooth_charts"], enabled);
+        }
     }
     #[test]
     fn invalid_and_future_settings_are_preserved() {

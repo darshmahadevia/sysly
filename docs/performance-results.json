@@ -1,0 +1,144 @@
+{
+  "completed_utc": "2026-10-17T04:54:06.995280+00:00",
+  "baseline_commit": "0b03293ba882c2428c5da0f9e6111a41301c5b6a",
+  "binary_sha256": {
+    "baseline": "f0d951bafa1ab199e218b4e2f978686767cfbc90967610771d0f3355a181d58c",
+    "candidate": "8543b76807d82e0716156345103ceae08bd59994ea2f77061a1f2f4b15d20b33"
+  },
+  "host": "Darwin Darshs-MacBook-Air.local 27.0.0 Darwin Kernel Version 27.0.0: Tue Aug 11 21:02:57 PDT 2026; root:xnu-13432.1.9~1/RELEASE_ARM64_T8132 arm64",
+  "cores": 10,
+  "method": "Alternating fresh visible Overview sessions. Default settings, 1320x900 window, 20 second warmup followed by five 5 second observation windows. CPU is percent of one core. No other Sysly session should run. No build or profiler should run during observation.",
+  "interruption": "The first four complete pairs ran before a conversation interruption. Both builds in pair five were rerun after resumption. The original unpaired fifth baseline is excluded.",
+  "foreground_checks": "Each accepted window passed visible and foreground checks at its endpoints and approximately once per second. Lost-focus windows were rejected and retried with a fixed limit.",
+  "scope": "Short visible Overview sessions with default settings. Not a mature-history or long-running leak test.",
+  "summary": {
+    "baseline": {
+      "cpu_percent_one_core": {
+        "median": 25.520258128968887,
+        "range": [
+          25.01548127755587,
+          26.3350524864582
+        ]
+      },
+      "rss_bytes": {
+        "median": 140607488,
+        "range": [
+          140394496,
+          140787712
+        ]
+      },
+      "physical_footprint_bytes": {
+        "median": 280069200,
+        "range": [
+          279741520,
+          281904232
+        ]
+      }
+    },
+    "candidate": {
+      "cpu_percent_one_core": {
+        "median": 2.5825454912038714,
+        "range": [
+          2.422627153971022,
+          3.4686052978565476
+        ]
+      },
+      "rss_bytes": {
+        "median": 139706368,
+        "range": [
+          139509760,
+          139788288
+        ]
+      },
+      "physical_footprint_bytes": {
+        "median": 277333048,
+        "range": [
+          277005392,
+          277546040
+        ]
+      }
+    }
+  },
+  "sessions": [
+    {
+      "binary": "baseline",
+      "pair": 1,
+      "cpu_percent_one_core": 26.3350524864582,
+      "rss_bytes": 140787712,
+      "physical_footprint_bytes": 280069200,
+      "rejected_windows": 0
+    },
+    {
+      "binary": "baseline",
+      "pair": 2,
+      "cpu_percent_one_core": 25.94034323370948,
+      "rss_bytes": 140607488,
+      "physical_footprint_bytes": 279823392,
+      "rejected_windows": 0
+    },
+    {
+      "binary": "baseline",
+      "pair": 3,
+      "cpu_percent_one_core": 25.01548127755587,
+      "rss_bytes": 140460032,
+      "physical_footprint_bytes": 281904232,
+      "rejected_windows": 0
+    },
+    {
+      "binary": "baseline",
+      "pair": 4,
+      "cpu_percent_one_core": 25.520258128968887,
+      "rss_bytes": 140394496,
+      "physical_footprint_bytes": 279741520,
+      "rejected_windows": 3
+    },
+    {
+      "binary": "baseline",
+      "pair": 5,
+      "cpu_percent_one_core": 25.265962448228553,
+      "rss_bytes": 140607488,
+      "physical_footprint_bytes": 280200296,
+      "rejected_windows": 0
+    },
+    {
+      "binary": "candidate",
+      "pair": 1,
+      "cpu_percent_one_core": 2.5825454912038714,
+      "rss_bytes": 139706368,
+      "physical_footprint_bytes": 277300280,
+      "rejected_windows": 0
+    },
+    {
+      "binary": "candidate",
+      "pair": 2,
+      "cpu_percent_one_core": 3.4686052978565476,
+      "rss_bytes": 139739136,
+      "physical_footprint_bytes": 277333048,
+      "rejected_windows": 1
+    },
+    {
+      "binary": "candidate",
+      "pair": 3,
+      "cpu_percent_one_core": 3.1461666737700678,
+      "rss_bytes": 139509760,
+      "physical_footprint_bytes": 277005392,
+      "rejected_windows": 0
+    },
+    {
+      "binary": "candidate",
+      "pair": 4,
+      "cpu_percent_one_core": 2.504060308072513,
+      "rss_bytes": 139788288,
+      "physical_footprint_bytes": 277464144,
+      "rejected_windows": 0
+    },
+    {
+      "binary": "candidate",
+      "pair": 5,
+      "cpu_percent_one_core": 2.422627153971022,
+      "rss_bytes": 139673600,
+      "physical_footprint_bytes": 277546040,
+      "rejected_windows": 0
+    }
+  ]
+}

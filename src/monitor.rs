@@ -5,7 +5,7 @@ use crate::{
 use std::{
     sync::{Arc, Condvar, Mutex, mpsc},
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 struct Policy {
@@ -52,25 +52,34 @@ impl Monitor {
             .name("sysly-sampler".into())
             .spawn(move || {
                 let mut collector = Collector::new();
+                let mut last_started = None;
                 loop {
                     let (lock, wake) = &*worker_policy;
                     let mut state = lock.lock().unwrap();
+                    while !state.stopped {
+                        if state.paused {
+                            state = wake.wait(state).unwrap();
+                            continue;
+                        }
+                        let interval = Duration::from_secs(if state.visible {
+                            state.interval
+                        } else {
+                            state.interval.max(5)
+                        });
+                        let remaining = last_started
+                            .map(|started: Instant| interval.saturating_sub(started.elapsed()))
+                            .unwrap_or_default();
+                        if remaining.is_zero() {
+                            break;
+                        }
+                        state = wake.wait_timeout(state, remaining).unwrap().0;
+                    }
                     if state.stopped {
                         break;
                     }
-                    while state.paused && !state.stopped {
-                        state = wake.wait(state).unwrap();
-                    }
-                    if state.stopped {
-                        break;
-                    }
-                    let interval = if state.visible {
-                        state.interval
-                    } else {
-                        state.interval.max(5)
-                    };
+                    last_started = Some(Instant::now());
                     drop(state);
-                    let snapshot = collector.sample(Duration::from_secs(interval));
+                    let snapshot = collector.sample_now();
                     let state = lock.lock().unwrap();
                     if state.stopped {
                         break;
@@ -78,7 +87,6 @@ impl Monitor {
                     if state.paused {
                         continue;
                     }
-                    drop(state);
                     *worker_latest.lock().unwrap() = Arc::new(snapshot);
                 }
             })
@@ -137,8 +145,58 @@ impl Drop for Monitor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Instant;
     use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
+
+    #[test]
+    fn hidden_and_long_intervals_wait_without_delaying_visibility_changes() {
+        fn wait_for_sample(monitor: &Monitor, after: u64) -> u64 {
+            let deadline = Instant::now() + Duration::from_secs(12);
+            loop {
+                let sequence = monitor.latest().sequence;
+                if sequence > after {
+                    return sequence;
+                }
+                assert!(Instant::now() < deadline, "sampler did not publish");
+                thread::sleep(Duration::from_millis(20));
+            }
+        }
+
+        let monitor = Monitor::start();
+        wait_for_sample(&monitor, 0);
+        monitor.set_visible(false);
+        let hidden_sequence = monitor.latest().sequence;
+        thread::sleep(Duration::from_millis(1400));
+        assert_eq!(monitor.latest().sequence, hidden_sequence);
+        monitor.set_visible(true);
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let visible_sequence = wait_for_sample(&monitor, hidden_sequence);
+        assert!(Instant::now() < deadline, "show waited for hidden interval");
+
+        monitor.set_interval(10);
+        thread::sleep(Duration::from_millis(1400));
+        assert_eq!(monitor.latest().sequence, visible_sequence);
+        monitor.set_interval(1);
+        let deadline = Instant::now() + Duration::from_secs(2);
+        assert_eq!(
+            wait_for_sample(&monitor, visible_sequence),
+            visible_sequence + 1
+        );
+        assert!(
+            Instant::now() < deadline,
+            "shorter interval did not wake sampler"
+        );
+
+        let worker = Arc::downgrade(&monitor.latest);
+        drop(monitor);
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while worker.upgrade().is_some() && Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(20));
+        }
+        assert!(
+            worker.upgrade().is_none(),
+            "sampler kept running after drop"
+        );
+    }
 
     #[test]
     fn pause_freezes_samples_and_long_sampling_does_not_block_signals() {

@@ -13,6 +13,8 @@ guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
     exit(2)
 }
 let request = VNRecognizeTextRequest()
+// Revision 3 fails to initialize its text runtime on the macOS 27 verification host.
+request.revision = 2
 request.recognitionLevel = .accurate
 request.usesLanguageCorrection = false
 try VNImageRequestHandler(cgImage: image).perform([request])

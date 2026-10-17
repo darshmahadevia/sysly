@@ -8,6 +8,28 @@ A native system monitor for Apple Silicon Macs, built with Rust and GPUI.
 
 See what is using your Mac's resources, inspect individual processes, and arrange the dashboard around the readings you care about. Sysly keeps CPU and memory summaries in the menu bar when you close the window.
 
+## Why I built it
+
+I wanted a GUI for btop. I like having system activity and process controls in one place, and I wanted that experience in a native Mac window. Sysly is my take on that idea, with charts, a searchable process list, and a menu bar summary.
+
+The monitor should leave resources for the work it is watching. I chose Rust to keep control over memory and runtime costs, and GPUI to build the interface without a webview. That choice is a starting point. Keeping Sysly light also means measuring the app and removing work it does not need to do.
+
+## How Sysly limits overhead
+
+Charts update when a sample arrives by default. Redrawing the whole dashboard at the display refresh rate spent CPU time without collecting any new readings. You can enable **Smooth chart scrolling** in **Appearance > Charts & menu bar** if you prefer continuous motion. Sampling and process controls work in either mode.
+
+The collection and rendering paths also avoid repeated work:
+
+- Charts share bounded history and read points directly. They no longer copy the history and each core's readings or build temporary point arrays for every frame.
+- The overview finds its five busiest processes once per sample. It no longer sorts the entire process list every time the window redraws.
+- The process page builds its search and sort results when you open it or its data changes. Name sorting converts each name to lowercase once per sort.
+- User names are cached by user ID for 60 seconds. Commands are assembled into one string, and counter cleanup reuses existing process and interface indexes.
+- The sampler keeps one latest snapshot. Interruptible waits let it respond to a reopened window or shorter refresh interval. Closing the window slows collection to at most once every five seconds. Pausing stops collection after any in-flight read finishes.
+
+These changes reduce redraws, temporary allocations, and repeated lookups. Native window buffers, fonts, and GPU rendering still have a memory cost. Sysly does not claim btop's memory footprint or complete feature parity. See the [overhead measurements](docs/performance.md) for measured results and their limits.
+
+On the test Mac, median foreground CPU use fell from 25.52% to 2.58% of one core across five sessions per build. Whole-app memory changed modestly, with physical footprint at 267.1 MiB before and 264.5 MiB after.
+
 ## What you can do
 
 - Track CPU and per-core activity, GPU activity, memory, swap, disk I/O, network traffic, and battery status.
@@ -40,6 +62,8 @@ open dist/Sysly.app
 ```
 
 The script creates `dist/Sysly.app` and `dist/Sysly.zip`. It signs the app with an ad-hoc signature for local use. Distribution to other Macs requires your own Developer ID signing and notarization.
+
+macOS File Provider can reattach Finder metadata to an app in a synced folder and invalidate strict signature checks. For the refreshed build in this workspace, extract `dist/Sysly.zip` outside the synced folder. The ZIP's extracted app passes signature verification there.
 
 For development, launch the app directly:
 
@@ -77,6 +101,14 @@ Run the tests and lint checks:
 cargo test --locked
 cargo clippy --locked --all-targets -- -D warnings
 ```
+
+To compare two release builds in alternating native GUI sessions, run:
+
+```sh
+python3 scripts/compare_overhead.py /path/to/baseline/sysly target/release/sysly
+```
+
+The script launches five sessions per build with isolated settings. It records CPU time, resident memory, and physical footprint. It needs the compiled `target/sysly-ui` helper and macOS automation permissions. Stop other Sysly instances and builds before measuring.
 
 Check the collectors against real macOS activity:
 
