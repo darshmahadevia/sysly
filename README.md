@@ -10,6 +10,25 @@ See what is using your Mac's resources, inspect individual processes, and arrang
 
 ![Sysly overview dashboard showing memory, GPU activity, and network traffic in the dark theme](assets/screenshots/overview.png)
 
+## Build and run
+
+You need an Apple Silicon Mac with macOS 14 or later, Rust 1.88 or newer, and the Xcode Command Line Tools.
+
+If you have not installed the Command Line Tools, run:
+
+```sh
+xcode-select --install
+```
+
+Clone the repository and build the app:
+
+```sh
+git clone https://github.com/darshmahadevia/sysly.git
+cd sysly
+scripts/bundle.sh
+open dist/Sysly.app
+```
+
 ## Why I built it
 
 I wanted a GUI for btop. I like having system activity and process controls in one place, and I wanted that experience in a native Mac window. Sysly is my take on that idea, with charts, a searchable process list, and a menu bar summary.
@@ -44,24 +63,7 @@ On the test Mac, median foreground CPU use fell from 25.52% to 2.58% of one core
 
 Missing hardware readings appear as unavailable.
 
-## Build and run
-
-You need an Apple Silicon Mac with macOS 14 or later, Rust 1.88 or newer, and the Xcode Command Line Tools.
-
-If you have not installed the Command Line Tools, run:
-
-```sh
-xcode-select --install
-```
-
-Clone the repository and build the app:
-
-```sh
-git clone https://github.com/darshmahadevia/sysly.git
-cd sysly
-scripts/bundle.sh
-open dist/Sysly.app
-```
+## Build details
 
 The script creates `dist/Sysly.app` and `dist/Sysly.zip`. It signs the app with an ad-hoc signature for local use. Distribution to other Macs requires your own Developer ID signing and notarization.
 
