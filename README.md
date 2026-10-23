@@ -8,9 +8,24 @@ A native system monitor for Apple Silicon Macs, built with Rust and GPUI.
 
 See what is using your Mac's resources, inspect individual processes, and arrange the dashboard around the readings you care about. Sysly keeps CPU and memory summaries in the menu bar when you close the window.
 
+**[Download Sysly for Apple Silicon](https://github.com/darshmahadevia/sysly/releases/download/v0.1.0/Sysly.zip)** · [Release notes](https://github.com/darshmahadevia/sysly/releases/tag/v0.1.0)
+
+Requires an Apple Silicon Mac and macOS 14 or later. Intel Macs are not supported. The download is a prebuilt app; you do not need Rust or Xcode.
+
 ![Sysly overview dashboard showing memory, GPU activity, and network traffic in the dark theme](assets/screenshots/overview.png)
 
-## Build and run
+## Install
+
+1. Download and unzip `Sysly.zip`.
+2. Drag `Sysly.app` to **Applications**, then open it.
+
+This preview is ad-hoc signed and is **not notarized by Apple**. macOS may block the first launch. If you trust this release, try opening Sysly once, then go to **System Settings > Privacy & Security > Open Anyway** and confirm. See [Apple's instructions for opening an unnotarized app](https://support.apple.com/en-us/102445).
+
+Closing the window keeps Sysly in the menu bar. Use **Quit Sysly** in its menu to exit.
+
+For bugs, include your Mac model, macOS version, and steps to reproduce in a [GitHub issue](https://github.com/darshmahadevia/sysly/issues).
+
+## Build from source
 
 You need an Apple Silicon Mac with macOS 14 or later, Rust 1.88 or newer, and the Xcode Command Line Tools.
 
@@ -65,9 +80,15 @@ Missing hardware readings appear as unavailable.
 
 ## Build details
 
-The script creates `dist/Sysly.app` and `dist/Sysly.zip`. It signs the app with an ad-hoc signature for local use. Distribution to other Macs requires your own Developer ID signing and notarization.
+The script creates `dist/Sysly.app` and `dist/Sysly.zip`. It signs the app with an ad-hoc signature. A download that passes Apple's normal Gatekeeper checks requires Developer ID signing and notarization; the preview does not have either.
 
-macOS File Provider can reattach Finder metadata to an app in a synced folder and invalidate strict signature checks. For the refreshed build in this workspace, extract `dist/Sysly.zip` outside the synced folder. The ZIP's extracted app passes signature verification there.
+Before publishing a release, verify the ZIP and write its SHA-256 checksum:
+
+```sh
+python3 scripts/verify_release.py
+```
+
+The verifier extracts the app outside the workspace, checks its bundle metadata, Apple Silicon architecture, and signature, and runs its sampling CLI. macOS File Provider can reattach Finder metadata in synced folders and invalidate strict signature checks on an otherwise valid app.
 
 For development, launch the app directly:
 
