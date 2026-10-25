@@ -14,6 +14,15 @@ Requires an Apple Silicon Mac and macOS 14 or later. Intel Macs are not supporte
 
 ![Sysly overview dashboard showing memory, GPU activity, and network traffic in the dark theme](assets/screenshots/overview.png)
 
+## Engineering highlights
+
+- Cut median foreground CPU use from 25.52% to 2.58% of one core in a recorded five-session-per-build comparison by making charts sample-driven and avoiding repeated dashboard work.
+- Built native resource monitoring and process controls with Rust, GPUI, and macOS APIs. A separate action worker keeps process controls independent of hardware sampling waits.
+- Bounded chart history to 902 samples and kept only the latest collector snapshot, so a slow interface does not accumulate a queue of old readings.
+- Added native verification for process search, inspection, confirmed signals, pause and resume, and menu bar reopening. Collector checks compare readings with macOS and a known 16 MiB loopback transfer.
+
+The CPU result covers short foreground Overview sessions on one 10-core Apple Silicon Mac. It is not a general hardware or long-running performance claim. See the [measurement method and limits](docs/performance.md), [raw results](docs/performance-results.json), and [architecture](docs/architecture.md).
+
 ## Install
 
 1. Download and unzip `Sysly.zip`.
