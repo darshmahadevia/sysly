@@ -19,7 +19,7 @@ Requires an Apple Silicon Mac and macOS 14 or later. Intel Macs are not supporte
 - Cut median foreground CPU use from 25.52% to 2.58% of one core in a recorded five-session-per-build comparison by making charts sample-driven and avoiding repeated dashboard work.
 - Built native resource monitoring and process controls with Rust, GPUI, and macOS APIs. A separate action worker keeps process controls independent of hardware sampling waits.
 - Bounded chart history to 902 samples and kept only the latest collector snapshot, so a slow interface does not accumulate a queue of old readings.
-- Added native verification for process search, inspection, confirmed signals, pause and resume, and menu bar reopening. Collector checks compare readings with macOS and a known 16 MiB loopback transfer.
+- Measured median foreground use of 2.73% of one core and 264.7 MiB physical footprint across five fresh native sessions on an Apple M4 Mac. See the [October 25 method, ranges, and raw results](docs/measurements/2026-10-25.md).
 
 The CPU result covers short foreground Overview sessions on one 10-core Apple Silicon Mac. It is not a general hardware or long-running performance claim. See the [measurement method and limits](docs/performance.md), [raw results](docs/performance-results.json), and [architecture](docs/architecture.md).
 

@@ -1,0 +1,310 @@
+{
+  "method": "Five fresh visible Overview sessions with isolated default settings at 1320 by 900 points. 20-second warmup including measure.py settling, then five 5-second windows. Native CPU time checked against ps, visibility and foreground checked throughout. Absolute resource use, no speedup comparison.",
+  "host": "macOS-27.0.1-arm64-arm-64bit",
+  "hardware": "Apple M4",
+  "memory_bytes": 17179869184,
+  "source_commit": "48c23080569c9b08cd0c104a897364bbe7fecb9b",
+  "binary_sha256": "8543b76807d82e0716156345103ceae08bd59994ea2f77061a1f2f4b15d20b33",
+  "trials": [
+    {
+      "trial": 1,
+      "load": "13:20  up 3 days,  1:14, 1 user, load averages: 5.52 7.82 8.05",
+      "window_bounds": "{\"Height\":900,\"Width\":1320,\"X\":195,\"Y\":104}",
+      "mode": "visible",
+      "pid": 48931,
+      "runs": [
+        {
+          "seconds": 5.209780542005319,
+          "cpu_percent_one_core": 2.1686830009256206,
+          "rss_bytes": 135610368,
+          "physical_footprint_bytes": 216368112
+        },
+        {
+          "seconds": 5.19049000000814,
+          "cpu_percent_one_core": 3.0165408275471983,
+          "rss_bytes": 135692288,
+          "physical_footprint_bytes": 269091824
+        },
+        {
+          "seconds": 5.198032041022088,
+          "cpu_percent_one_core": 3.6151670513696286,
+          "rss_bytes": 135823360,
+          "physical_footprint_bytes": 269173744
+        },
+        {
+          "seconds": 5.203741082979832,
+          "cpu_percent_one_core": 2.3057105728370932,
+          "rss_bytes": 135888896,
+          "physical_footprint_bytes": 216564720
+        },
+        {
+          "seconds": 5.214657792006619,
+          "cpu_percent_one_core": 3.1366591671152757,
+          "rss_bytes": 135970816,
+          "physical_footprint_bytes": 269304816
+        }
+      ],
+      "rejected_windows": 0,
+      "cpu_median_percent_one_core": 3.0165408275471983,
+      "cpu_range_percent_one_core": [
+        2.1686830009256206,
+        3.6151670513696286
+      ],
+      "cpu_time_weighted_percent_one_core": 2.848261405706293,
+      "rss_range_bytes": [
+        135610368,
+        135970816
+      ],
+      "physical_footprint_range_bytes": [
+        216368112,
+        269304816
+      ],
+      "interpretation": "Absolute steady-state process observation. No speedup comparison. Includes collector and UI. RSS includes shared resident pages and is not physical footprint. Mode must be established through the real UI before running."
+    },
+    {
+      "trial": 2,
+      "load": "13:21  up 3 days,  1:15, 1 user, load averages: 4.16 7.08 7.76",
+      "window_bounds": "{\"Height\":900,\"Width\":1320,\"X\":195,\"Y\":104}",
+      "mode": "visible",
+      "pid": 49117,
+      "runs": [
+        {
+          "seconds": 5.202335874986602,
+          "cpu_percent_one_core": 2.1404767847088233,
+          "rss_bytes": 140509184,
+          "physical_footprint_bytes": 226919408
+        },
+        {
+          "seconds": 5.211806500010425,
+          "cpu_percent_one_core": 2.880634254802685,
+          "rss_bytes": 140558336,
+          "physical_footprint_bytes": 279659504
+        },
+        {
+          "seconds": 5.199435332993744,
+          "cpu_percent_one_core": 3.357374993375586,
+          "rss_bytes": 140673024,
+          "physical_footprint_bytes": 279757808
+        },
+        {
+          "seconds": 5.20283420800115,
+          "cpu_percent_one_core": 2.218989280031037,
+          "rss_bytes": 140738560,
+          "physical_footprint_bytes": 227148784
+        },
+        {
+          "seconds": 5.198482958978275,
+          "cpu_percent_one_core": 3.0329898083252,
+          "rss_bytes": 140886016,
+          "physical_footprint_bytes": 279921648
+        }
+      ],
+      "rejected_windows": 0,
+      "cpu_median_percent_one_core": 2.880634254802685,
+      "cpu_range_percent_one_core": [
+        2.1404767847088233,
+        3.357374993375586
+      ],
+      "cpu_time_weighted_percent_one_core": 2.726023732718027,
+      "rss_range_bytes": [
+        140509184,
+        140886016
+      ],
+      "physical_footprint_range_bytes": [
+        226919408,
+        279921648
+      ],
+      "interpretation": "Absolute steady-state process observation. No speedup comparison. Includes collector and UI. RSS includes shared resident pages and is not physical footprint. Mode must be established through the real UI before running."
+    },
+    {
+      "trial": 3,
+      "load": "13:22  up 3 days,  1:16, 1 user, load averages: 3.65 6.47 7.50",
+      "window_bounds": "{\"Height\":900,\"Width\":1320,\"X\":195,\"Y\":104}",
+      "mode": "visible",
+      "pid": 49283,
+      "runs": [
+        {
+          "seconds": 5.2013206249976065,
+          "cpu_percent_one_core": 2.1959583261296443,
+          "rss_bytes": 140296192,
+          "physical_footprint_bytes": 224855024
+        },
+        {
+          "seconds": 5.20197508300771,
+          "cpu_percent_one_core": 3.074036735053753,
+          "rss_bytes": 140378112,
+          "physical_footprint_bytes": 277595120
+        },
+        {
+          "seconds": 5.184891375014558,
+          "cpu_percent_one_core": 3.1302029929131234,
+          "rss_bytes": 140460032,
+          "physical_footprint_bytes": 277644272
+        },
+        {
+          "seconds": 5.200240291014779,
+          "cpu_percent_one_core": 2.5600691996873257,
+          "rss_bytes": 140509184,
+          "physical_footprint_bytes": 225018864
+        },
+        {
+          "seconds": 5.2121004999789875,
+          "cpu_percent_one_core": 3.160356526778357,
+          "rss_bytes": 140607488,
+          "physical_footprint_bytes": 277775344
+        }
+      ],
+      "rejected_windows": 0,
+      "cpu_median_percent_one_core": 3.074036735053753,
+      "cpu_range_percent_one_core": [
+        2.1959583261296443,
+        3.160356526778357
+      ],
+      "cpu_time_weighted_percent_one_core": 2.8240880155381163,
+      "rss_range_bytes": [
+        140296192,
+        140607488
+      ],
+      "physical_footprint_range_bytes": [
+        224855024,
+        277775344
+      ],
+      "interpretation": "Absolute steady-state process observation. No speedup comparison. Includes collector and UI. RSS includes shared resident pages and is not physical footprint. Mode must be established through the real UI before running."
+    },
+    {
+      "trial": 4,
+      "load": "13:22  up 3 days,  1:17, 1 user, load averages: 3.78 6.09 7.30",
+      "window_bounds": "{\"Height\":900,\"Width\":1320,\"X\":195,\"Y\":104}",
+      "mode": "visible",
+      "pid": 49522,
+      "runs": [
+        {
+          "seconds": 5.198049458995229,
+          "cpu_percent_one_core": 2.155183418005696,
+          "rss_bytes": 140410880,
+          "physical_footprint_bytes": 224855024
+        },
+        {
+          "seconds": 5.207342207984766,
+          "cpu_percent_one_core": 2.5886646126943837,
+          "rss_bytes": 140492800,
+          "physical_footprint_bytes": 277578736
+        },
+        {
+          "seconds": 5.190641624998534,
+          "cpu_percent_one_core": 3.570481038556623,
+          "rss_bytes": 140591104,
+          "physical_footprint_bytes": 277644272
+        },
+        {
+          "seconds": 5.2022801249986514,
+          "cpu_percent_one_core": 2.270350637837492,
+          "rss_bytes": 140673024,
+          "physical_footprint_bytes": 225035248
+        },
+        {
+          "seconds": 5.204373790998943,
+          "cpu_percent_one_core": 2.7345981293556583,
+          "rss_bytes": 140787712,
+          "physical_footprint_bytes": 277791728
+        }
+      ],
+      "rejected_windows": 0,
+      "cpu_median_percent_one_core": 2.5886646126943837,
+      "cpu_range_percent_one_core": [
+        2.155183418005696,
+        3.570481038556623
+      ],
+      "cpu_time_weighted_percent_one_core": 2.663523591980475,
+      "rss_range_bytes": [
+        140410880,
+        140787712
+      ],
+      "physical_footprint_range_bytes": [
+        224855024,
+        277791728
+      ],
+      "interpretation": "Absolute steady-state process observation. No speedup comparison. Includes collector and UI. RSS includes shared resident pages and is not physical footprint. Mode must be established through the real UI before running."
+    },
+    {
+      "trial": 5,
+      "load": "13:23  up 3 days,  1:18, 1 user, load averages: 4.22 5.84 7.14",
+      "window_bounds": "{\"Height\":900,\"Width\":1320,\"X\":195,\"Y\":104}",
+      "mode": "visible",
+      "pid": 49672,
+      "runs": [
+        {
+          "seconds": 5.209234291978646,
+          "cpu_percent_one_core": 1.6806820687923412,
+          "rss_bytes": 140460032,
+          "physical_footprint_bytes": 226804720
+        },
+        {
+          "seconds": 5.20272216599551,
+          "cpu_percent_one_core": 2.7789282620476397,
+          "rss_bytes": 140525568,
+          "physical_footprint_bytes": 279544816
+        },
+        {
+          "seconds": 5.2048037920030765,
+          "cpu_percent_one_core": 3.4821701689978486,
+          "rss_bytes": 140623872,
+          "physical_footprint_bytes": 279626736
+        },
+        {
+          "seconds": 5.201771291001933,
+          "cpu_percent_one_core": 2.3367144548805103,
+          "rss_bytes": 140689408,
+          "physical_footprint_bytes": 227001328
+        },
+        {
+          "seconds": 5.19991591598955,
+          "cpu_percent_one_core": 2.943117301751148,
+          "rss_bytes": 140787712,
+          "physical_footprint_bytes": 279757808
+        }
+      ],
+      "rejected_windows": 0,
+      "cpu_median_percent_one_core": 2.7789282620476397,
+      "cpu_range_percent_one_core": [
+        1.6806820687923412,
+        3.4821701689978486
+      ],
+      "cpu_time_weighted_percent_one_core": 2.6441273105853136,
+      "rss_range_bytes": [
+        140460032,
+        140787712
+      ],
+      "physical_footprint_range_bytes": [
+        226804720,
+        279757808
+      ],
+      "interpretation": "Absolute steady-state process observation. No speedup comparison. Includes collector and UI. RSS includes shared resident pages and is not physical footprint. Mode must be established through the real UI before running."
+    }
+  ],
+  "summary": {
+    "cpu_percent_one_core": {
+      "median": 2.726023732718027,
+      "range": [
+        2.6441273105853136,
+        2.848261405706293
+      ]
+    },
+    "rss_bytes": {
+      "median": 140591104,
+      "range": [
+        135823360,
+        140673024
+      ]
+    },
+    "physical_footprint_bytes": {
+      "median": 277595120,
+      "range": [
+        269091824,
+        279659504
+      ]
+    }
+  },
+  "successful_sessions": 5,
+  "rejected_windows": 0
+}

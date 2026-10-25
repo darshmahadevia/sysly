@@ -1,0 +1,24 @@
+{
+  "result": "VERIFIED",
+  "samples": 6,
+  "memory_bytes_matches_sysctl": 17179869184,
+  "cores_match_sysctl": 10,
+  "transfer_bytes_verified": 16777216,
+  "process_counts": [
+    600,
+    600,
+    600,
+    599,
+    599,
+    599
+  ],
+  "gpu_available": true,
+  "cpu_temperature_available": true,
+  "fans": [],
+  "battery_available": true,
+  "disk_io_available": true,
+  "hardware_status": "IOReport \u00b7 GPU active residency \u00b7 power estimates",
+  "warnings": [
+    "APFS volumes may share physical disk IO counters; do not sum volume throughput"
+  ]
+}
