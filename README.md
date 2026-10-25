@@ -6,7 +6,7 @@
 
 A native system monitor for Apple Silicon Macs, built with Rust and GPUI.
 
-See what is using your Mac's resources, inspect individual processes, and arrange the dashboard around the readings you care about. Sysly keeps CPU and memory summaries in the menu bar when you close the window.
+Track resource use, inspect processes, and arrange the dashboard around the readings you need. CPU and memory summaries stay in the menu bar when you close the window.
 
 **[Download Sysly for Apple Silicon](https://github.com/darshmahadevia/sysly/releases/download/v0.1.0/Sysly.zip)** · [Release notes](https://github.com/darshmahadevia/sysly/releases/tag/v0.1.0)
 
@@ -16,10 +16,10 @@ Requires an Apple Silicon Mac and macOS 14 or later. Intel Macs are not supporte
 
 ## Engineering highlights
 
-- Cut median foreground CPU use from 25.52% to 2.58% of one core in a recorded five-session-per-build comparison by making charts sample-driven and avoiding repeated dashboard work.
+- Cut median foreground CPU use from 25.52% to 2.58% of one core by updating charts on new samples and caching dashboard work. The comparison used five sessions per build.
 - Built native resource monitoring and process controls with Rust, GPUI, and macOS APIs. A separate action worker keeps process controls independent of hardware sampling waits.
 - Bounded chart history to 902 samples and kept only the latest collector snapshot, so a slow interface does not accumulate a queue of old readings.
-- Measured median foreground use of 2.73% of one core and 264.7 MiB physical footprint across five fresh native sessions on an Apple M4 Mac. See the [October 25 method, ranges, and raw results](docs/measurements/2026-10-25.md).
+- Measured median foreground CPU use of 2.73% of one core and a physical footprint of 264.7 MiB. The test used five fresh native sessions on an Apple M4 Mac. See the [October 25 method, ranges, and raw results](docs/measurements/2026-10-25.md).
 
 The CPU result covers short foreground Overview sessions on one 10-core Apple Silicon Mac. It is not a general hardware or long-running performance claim. See the [measurement method and limits](docs/performance.md), [raw results](docs/performance-results.json), and [architecture](docs/architecture.md).
 
@@ -55,9 +55,9 @@ open dist/Sysly.app
 
 ## Why I built it
 
-I wanted a GUI for btop. I like having system activity and process controls in one place, and I wanted that experience in a native Mac window. Sysly is my take on that idea, with charts, a searchable process list, and a menu bar summary.
+I wanted btop's system readings and process controls in a native Mac window. Sysly puts charts, a searchable process list, and a menu bar summary in one app.
 
-The monitor should leave resources for the work it is watching. I chose Rust to keep control over memory and runtime costs, and GPUI to build the interface without a webview. That choice is a starting point. Keeping Sysly light also means measuring the app and removing work it does not need to do.
+I chose Rust to control memory and runtime costs, and GPUI to build the interface without a webview. I use measurements to find redraws, allocations, and lookups the app can skip.
 
 ## How Sysly limits overhead
 
@@ -73,7 +73,7 @@ The collection and rendering paths also avoid repeated work:
 
 These changes reduce redraws, temporary allocations, and repeated lookups. Native window buffers, fonts, and GPU rendering still have a memory cost. Sysly does not claim btop's memory footprint or complete feature parity. See the [overhead measurements](docs/performance.md) for measured results and their limits.
 
-On the test Mac, median foreground CPU use fell from 25.52% to 2.58% of one core across five sessions per build. Whole-app memory changed modestly, with physical footprint at 267.1 MiB before and 264.5 MiB after.
+On the test Mac, median foreground CPU use fell from 25.52% to 2.58% of one core across five sessions per build. Median physical footprint changed from 267.1 MiB to 264.5 MiB.
 
 ## What you can do
 
