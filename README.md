@@ -14,7 +14,7 @@ Requires an Apple Silicon Mac and macOS 14 or later. Intel Macs are not supporte
 
 The v0.1.0 download has the earlier interface. To run the design shown here, [build from source](#build-from-source).
 
-![Sysly overview: a plain-language verdict above processor, memory, graphics, network and storage lanes on one timeline, with the busiest apps and battery below](assets/screenshots/overview.png)
+https://github.com/user-attachments/assets/f07a2920-2f3a-4587-ba30-16f711bf6fba
 
 ## Engineering highlights
 
