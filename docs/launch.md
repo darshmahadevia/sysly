@@ -13,6 +13,6 @@ Try the preview:
 https://github.com/darshmahadevia/sysly/releases/tag/v0.1.0
 ```
 
-Image alt text: Sysly's dark dashboard showing memory use, GPU activity, network traffic, and a sidebar of Mac resource readings.
+Image alt text: Sysly's dark overview with a plain-language verdict above processor, memory, graphics, network, and storage charts on one timeline, and a sidebar of live resource readings.
 
 The release page includes the ZIP download and first-launch instructions for the unnotarized preview.
