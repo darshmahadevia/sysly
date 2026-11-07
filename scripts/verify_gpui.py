@@ -63,7 +63,7 @@ def click(text, *, below=0, right_of=0, top=1):
     def matches_text(value):
         if value.casefold() == text.casefold():
             return True
-        return text in {"Pause", "Resume"} and value.startswith(text) and len(value[len(text):].strip()) <= 2
+        return False
 
     matches = [line for line in last["lines"] if matches_text(line["text"])
                and below < line["y"] < top and line["x"] > right_of]
@@ -95,57 +95,76 @@ def wait_state(predicate, label):
     raise AssertionError(label)
 
 
+def wait_sheet(title, label, timeout=6):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        tree = drive("dump")
+        if title in tree:
+            events.append(label)
+            return
+        time.sleep(0.15)
+    raise AssertionError(f"Native sheet did not show {title!r}\n{tree}")
+
+
 child = None if args.resume_after_reopen else subprocess.Popen(["/bin/sleep", "600"])
 try:
     if not args.resume_after_reopen:
         drive("key", "1", "cmd")
-        wait_for("View details", "overview renders live resource sections")
+        wait_for("Details", "overview renders live resource sections")
+        bounds = json.loads(drive("bounds"))
+        drive("hover", bounds["Width"] * 0.7, 260)
+        wait_for("ago", "hovering a chart scrubs the recorder to that moment")
+        drive("key", "3", "cmd")
+        wait_for("Each core", "processor page opens by keyboard")
         drive("key", "2", "cmd")
-        wait_for("Disk I/O", "process table opens by keyboard")
+        wait_for("Disk", "process table opens by keyboard")
         search("sysly-no-such-process-493817")
-        wait_for("No processes match", "search displays an empty result")
+        wait_for("Nothing matches", "search displays an empty result")
         search(str(child.pid))
         wait_for("sleep", "PID search finds the verification child")
-        click("Memory", right_of=0.4, top=0.4)
-        click("Tree view")
+        # Vision OCR misreads the sparse numeric columns, so these two controls are
+        # driven by layout position. Results are still checked by reading the screen.
+        drive("point", bounds["Width"] - 134, 117)
+        drive("point", 664, 80)
         wait_for("sleep", "tree search retains the child")
-        click("sleep", right_of=0.2)
-        wait_for("Quit process", "process inspector opens")
+        click("sleep", right_of=0.15)
+        wait_for("Command", "process inspector opens beside the table")
         for action, confirm, predicate, label in [
-            ("Pause process", "Pause", lambda: stopped(child.pid), "confirmed STOP changes the child OS state"),
-            ("Resume process", "Resume", lambda: not stopped(child.pid), "confirmed CONT resumes the child"),
+            ("Pause", "Pause", lambda: stopped(child.pid), "confirmed STOP changes the child OS state"),
+            ("Resume", "Resume", lambda: not stopped(child.pid), "confirmed CONT resumes the child"),
         ]:
-            click(action, right_of=0.5)
-            wait_for(f"{confirm} sleep?", f"{confirm} asks for confirmation")
+            drive("point", bounds["Width"] - 243, bounds["Height"] - 30)
+            wait_sheet(f"{confirm} sleep?", f"{confirm} asks for confirmation in a native sheet")
             assert child.poll() is None, "Unconfirmed action exited the child"
             if confirm == "Pause":
                 assert not stopped(child.pid), "STOP was sent before confirmation"
             else:
                 assert stopped(child.pid), "CONT was sent before confirmation"
-            click(confirm, below=0.2, right_of=0.3)
+            drive("confirm", confirm)
             wait_state(predicate, label)
-        click("Quit process", right_of=0.5)
-        wait_for("Quit sleep?", "TERM asks for confirmation")
+            time.sleep(0.5)
+        drive("point", bounds["Width"] - 243, bounds["Height"] - 64)
+        wait_sheet("Quit sleep?", "TERM asks for confirmation in a native sheet")
         assert child.poll() is None, "TERM was sent before confirmation"
-        click("Quit", below=0.2, right_of=0.3)
+        drive("confirm", "Quit")
         assert child.wait(timeout=3) < 0, "Child did not exit from TERM"
         events.append("confirmed TERM exits the owned child")
         drive("key", "escape")
         drive("key", "1", "cmd")
-        click("Pause", right_of=0.5, top=0.2)
-        wait_for("Resume", "sampling pauses")
+        drive("key", "p", "cmd")
+        wait_for("Paused", "sampling pauses")
         drive("close")
         subprocess.run(["kill", "-0", str(args.pid)], check=True)
         wait_state(lambda: drive("visible").strip() == "false", "close hides the actual window")
         events.append("closing the window keeps the menu bar process alive")
         drive("press", "Open Sysly")
         wait_state(lambda: drive("visible").strip() == "true", "menu bar makes the window visible")
-        wait_for("Resume", "menu bar reopens the paused dashboard")
-    click("Resume", right_of=0.5, top=0.2)
-    wait_for("Pause", "sampling resumes")
+        wait_for("Paused", "menu bar reopens the paused dashboard")
+    drive("key", "p", "cmd")
+    wait_for("Live", "sampling resumes")
     drive("key", ",", "cmd")
-    wait_for("Make it yours", "appearance opens by keyboard")
-    wait_for("Layout & text", "customization tabs are visible")
+    wait_for("Sampling", "settings open by keyboard")
+    wait_for("Appearance", "settings tabs are visible")
     drive("key", "1", "cmd")
     report = {"result": "VERIFIED", "events": events}
     (args.output / "report.json").write_text(json.dumps(report, indent=2) + "\n")

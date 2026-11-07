@@ -6,11 +6,11 @@ Drag-and-drop ordering, half/full width, drag resizing, visibility, custom copy,
 
 ## How to get to it (user POV)
 
-Choose Edit layout on Overview to move and resize sections. Choose Customize for appearance, layout/text, charts, and menu bar controls.
+Choose Customize on Overview, or press Command-E, to move, resize, rename, and hide sections in place. Settings holds themes, text, saved layouts, and files.
 
 ## Driving it with native Accessibility
 
-Read a fresh dump. Drag Move Processor onto Move Memory. Verify the cards exchange order and the saved section vector matches. Drag Resize Processor downward and verify visible height and persisted graph height change. Use Make wide to verify width. Change a theme preset and import a sample from `themes/` through the real Open panel. Relaunch the same configuration and verify the result.
+Use `drag-point` from one section's handle to another's. Verify the order changes and the saved section vector matches. Drag a bottom grip downward and verify visible height and persisted graph height change. Use Half and Full to verify width. Change a theme preset and import a sample from `themes/` through the real Open panel. Relaunch the same configuration and verify the result.
 
 ## Gotchas
 

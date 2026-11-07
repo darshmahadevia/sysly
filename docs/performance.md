@@ -1,6 +1,6 @@
 # Overhead measurements
 
-Sysly defaults to sample-driven charts. Continuous chart scrolling remains available in Appearance. Both modes collect the same readings at the configured interval.
+Sysly defaults to sample-driven charts. Continuous chart scrolling remains available in Settings. Both modes collect the same readings at the configured interval.
 
 ## Recorded results
 
@@ -9,6 +9,17 @@ On the 10-core Apple Silicon test Mac, median foreground CPU use fell from 25.52
 Whole-app memory changed much less. Median physical footprint fell from 267.1 MiB to 264.5 MiB. Median RSS fell from 134.1 MiB to 133.2 MiB. These are modest changes, not a large reduction in resident memory. The removed chart allocations reduce allocation traffic. Native rendering still carries its own memory cost.
 
 The [recorded session results](performance-results.json) include executable hashes, medians, ranges, and rejected-window counts. Each build has five sessions, with five accepted observation windows per session. Four pairs completed before a conversation interruption. Both builds in the fifth pair ran again after resumption, and the interrupted unpaired baseline is excluded.
+
+## Recorder redesign
+
+The November 6, 2026 redesign added shared-time lanes, area fills, sidebar sparklines, real app icons, app grouping, and the verdict. Five alternating fresh sessions per build compared it with the previous commit on the same Mac. Each session used default settings, a 20-second warmup, and five five-second windows.
+
+| Build | Median CPU, % of one core | Range | Median physical footprint |
+| --- | --- | --- | --- |
+| Before | 2.66 | 1.62 to 2.84 | 253.8 MiB |
+| After | 2.77 | 2.76 to 3.01 | 266.4 MiB |
+
+The redesign adds about 0.1 percentage points of one core and about 13 MiB. Other apps were running throughout, and footprint varied widely between sessions in both builds, so treat these as small and approximate. `scripts/compare_overhead.py` could not finish this run: the Mac reported the window as not visible partway through. These figures come from a simpler alternating loop around `scripts/measure.py`, without its foreground checks, so they are less strict than the results above.
 
 ## What changed and why
 
@@ -22,7 +33,7 @@ The sampling worker uses interruptible interval waits. Reopening the window or s
 
 The final implementation passes 32 release tests and release clippy with warnings denied. The real collector matches macOS memory and core counts, detects a CPU workload, and measures a verified 16 MiB loopback transfer.
 
-Native interaction checks verify process search, tree view, inspection, confirmed STOP, CONT, and TERM signals, pause and resume, closing to the menu bar, reopening, and Appearance navigation. Frame captures verify that sample-driven charts hold between samples, smooth charts move between samples, and paused charts remain frozen. The smoothing preference survives storage and older version-1 settings default to sample-driven updates.
+Native interaction checks verify process search, tree view, inspection, confirmed STOP, CONT, and TERM signals, pause and resume, closing to the menu bar, reopening, and Settings navigation. Frame captures verify that sample-driven charts hold between samples, smooth charts move between samples, and paused charts remain frozen. The smoothing preference survives storage and older version-1 settings default to sample-driven updates.
 
 The refreshed `dist/Sysly.zip` passes archive integrity checks and strict signature verification after extraction outside the synced workspace. Its executable's machine code matches the measured release build. A native launch and clean quit also pass. macOS File Provider reattaches Finder metadata to `dist/Sysly.app` in this workspace, so strict signature checks on that local directory fail. Extract the ZIP outside the synced folder when checking its signature.
 

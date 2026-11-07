@@ -6,13 +6,15 @@
 
 A native system monitor for Apple Silicon Macs, built with Rust and GPUI.
 
-Track resource use, inspect processes, and arrange the dashboard around the readings you need. CPU and memory summaries stay in the menu bar when you close the window.
+Sysly tells you in one sentence how your Mac is doing, and names what is responsible when something is wrong. Every resource shares one timeline, so you can hover over any moment to see what was happening across your Mac. A summary stays in the menu bar when you close the window.
 
 **[Download Sysly for Apple Silicon](https://github.com/darshmahadevia/sysly/releases/download/v0.1.0/Sysly.zip)** · [Release notes](https://github.com/darshmahadevia/sysly/releases/tag/v0.1.0)
 
 Requires an Apple Silicon Mac and macOS 14 or later. Intel Macs are not supported. The download is a prebuilt app; you do not need Rust or Xcode.
 
-![Sysly overview dashboard showing memory, GPU activity, and network traffic in the dark theme](assets/screenshots/overview.png)
+The v0.1.0 download has the earlier interface. To run the design shown here, [build from source](#build-from-source).
+
+![Sysly overview: a plain-language verdict above processor, memory, graphics, network and storage lanes on one timeline, with the busiest apps and battery below](assets/screenshots/overview.png)
 
 ## Engineering highlights
 
@@ -61,7 +63,7 @@ I chose Rust to control memory and runtime costs, and GPUI to build the interfac
 
 ## How Sysly limits overhead
 
-Charts update when a sample arrives by default. Redrawing the whole dashboard at the display refresh rate spent CPU time without collecting any new readings. You can enable **Smooth chart scrolling** in **Appearance > Charts & menu bar** if you prefer continuous motion. Sampling and process controls work in either mode.
+Charts update when a sample arrives by default. Redrawing the whole dashboard at the display refresh rate spent CPU time without collecting any new readings. You can enable **Smooth chart scrolling** in **Settings > General** if you prefer continuous motion. Sampling and process controls work in either mode.
 
 The collection and rendering paths also avoid repeated work:
 
@@ -77,15 +79,17 @@ On the test Mac, median foreground CPU use fell from 25.52% to 2.58% of one core
 
 ## What you can do
 
-- Track CPU and per-core activity, GPU activity, memory, swap, disk I/O, network traffic, and battery status.
+- Get a plain-language verdict that names the culprit when your Mac is hot, short on memory, low on storage, or working hard.
+- Hover over any chart to rewind every resource to that moment and see what was busiest then.
+- Track CPU and per-core activity, GPU activity, memory composition and pressure, swap, disk I/O, network traffic, and battery status.
 - Read temperatures, frequencies, power estimates, and fan speeds where your hardware exposes them.
-- Search processes by name, PID, or user. Sort the list, browse a process tree, and inspect commands and resource use.
-- Terminate, force quit, pause, or resume a process after confirmation, within your account's permissions.
-- Drag dashboard sections into place, change their width, resize charts, and edit labels and descriptions.
-- Choose colors and fonts, save named layouts, and import or export themes and layouts.
-- Adjust the history window, refresh rate, display density, and menu bar readings.
+- See apps with their helpers folded in and their real icons, or browse every process as a list or tree.
+- Quit, force quit, pause, or resume a process after a native confirmation, within your account's permissions.
+- Rearrange the Overview in place: drag sections, resize them, rename them, and hide them.
+- Follow the system's light or dark mode, or choose a theme, colors, fonts, and text size. Save named layouts, and import or export themes and layouts.
+- Adjust the refresh rate, display density, and menu bar reading.
 
-Missing hardware readings appear as unavailable.
+Missing hardware readings appear as not available.
 
 ## Build details
 
@@ -109,9 +113,9 @@ Sysly uses GPUI 0.2.2 and gpui-component 0.5.1. GPUI's `runtime_shaders` feature
 
 ## Customize the dashboard
 
-Press `Command-,` to open Appearance. In **Layout & text**, drag sections into a new order, adjust their size, and edit dashboard copy. The other tabs control colors, fonts, chart history, refresh rate, and the menu bar.
+Choose **Customize** on the Overview, or press `Command-E`. Drag sections into a new order, drag a bottom edge to resize, rename them, or hide them. Press `Command-,` for themes, colors, fonts, sampling, and saved layouts.
 
-Use `Command-1` for Overview, `Command-2` for Apps & processes, and `Command-F` for process search. The [dashboard guide](docs/dashboard.md) covers navigation and customization.
+Use `Command-1` for Overview, `Command-2` for Apps & processes, `Command-3` to `Command-8` for each resource, `Command-F` for process search, and `Command-P` to pause. The [dashboard guide](docs/dashboard.md) covers everything else.
 
 Try the [included themes](themes/), or export your own. Themes store colors, font family, and text size. Layouts store section order, visibility, widths, chart heights, labels, and descriptions. A selected local font file stays on your Mac.
 
@@ -121,9 +125,9 @@ Settings live at `~/Library/Application Support/Sysly/preferences.json`. If sett
 
 CPU activity shows the percentage of the Mac's total CPU capacity in use. Individual process CPU activity is per core and can exceed 100%. GPU activity measures active residency, not rendering speed.
 
-Memory readings follow macOS counters. Available memory includes reclaimable memory, so used and available memory do not add up to total memory. Memory use alone does not indicate memory pressure.
+Memory readings follow macOS counters. Available memory includes reclaimable memory, so used and available memory do not add up to total memory. Sysly judges memory by the kernel's pressure level, not by how much is in use, because macOS keeps memory busy on purpose.
 
-Network rates use the actual time between samples. The first sample establishes a baseline. Interface totals come from macOS and do not start at zero when you open Sysly. APFS volumes can share physical disk I/O counters, so do not add their throughput together.
+Network rates use the actual time between samples. The first sample establishes a baseline. Interface totals come from macOS and do not start at zero when you open Sysly. Storage uses the decimal units Finder shows. APFS volumes can share physical disk I/O counters, so do not add their throughput together.
 
 Hardware readings depend on the Mac and macOS version. Power readings are estimates. Sysly uses [macmon](https://github.com/vladkens/macmon) for Apple Silicon hardware data, including private Apple interfaces. Support for every chip and macOS version needs separate verification.
 
@@ -161,7 +165,7 @@ target/release/sysly --sample 5 1
 
 Snapshots include process commands. Treat them as local diagnostic data.
 
-For native interaction checks, run `python3 scripts/verify_gpui.py PID` against a running Sysly instance. The script needs macOS Accessibility and screen capture permissions. It compiles Swift helpers and reads captured window text with Vision OCR because GPUI 0.2.2 does not expose content labels through Accessibility. Process signal checks use a disposable child process.
+For native interaction checks, run `python3 scripts/verify_gpui.py PID` and `python3 scripts/verify_tray.py PID` against a running Sysly instance. The script needs macOS Accessibility and screen capture permissions. It compiles Swift helpers and reads captured window text with Vision OCR because GPUI 0.2.2 does not expose content labels through Accessibility. Process signal checks use a disposable child process.
 
 Read the [architecture guide](docs/architecture.md) for code ownership and data sources, or the [verification notes](docs/verification.md) for recorded results and limits.
 

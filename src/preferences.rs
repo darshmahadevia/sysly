@@ -10,6 +10,11 @@ use std::{
 const VERSION: u32 = 1;
 const MAX_BYTES: u64 = 1024 * 1024;
 const MAX_SAVED_LAYOUTS: usize = 12;
+const DEFAULT_TITLE: &str = "Overview";
+const LEGACY_TITLE: &str = "Your Mac, at a glance";
+/// The ranges the recorder offers, in seconds. Samples are kept for the longest
+/// one, so changing the range never discards history.
+pub const HISTORY_RANGES: [u32; 3] = [60, 300, 900];
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -38,9 +43,9 @@ impl SectionKind {
             Self::Processor => "Processor",
             Self::Memory => "Memory",
             Self::Graphics => "Graphics",
-            Self::Network => "Internet & network",
+            Self::Network => "Network",
             Self::Storage => "Storage",
-            Self::Battery => "Battery & cooling",
+            Self::Battery => "Battery & power",
             Self::Processes => "Apps & processes",
         }
     }
@@ -81,12 +86,12 @@ impl SectionConfig {
             title: kind.title().into(),
             description: kind.description().into(),
             visible: true,
-            span: if kind == SectionKind::Processes {
-                Span::Full
-            } else {
+            span: if matches!(kind, SectionKind::Processes | SectionKind::Battery) {
                 Span::Half
+            } else {
+                Span::Full
             },
-            graph_height: 90.0,
+            graph_height: 64.0,
             details: false,
         }
     }
@@ -102,6 +107,14 @@ pub enum Density {
     #[default]
     Comfortable,
     Compact,
+}
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MenuBarReading {
+    #[default]
+    Icon,
+    Cpu,
+    Memory,
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -124,6 +137,8 @@ pub struct Theme {
     pub memory: [u8; 3],
     pub gpu: [u8; 3],
     pub network: [u8; 3],
+    pub storage: [u8; 3],
+    pub battery: [u8; 3],
     pub danger: [u8; 3],
     pub font: FontChoice,
     pub font_size: f32,
@@ -132,17 +147,19 @@ impl Theme {
     pub fn dark() -> Self {
         Self {
             name: "Graphite".into(),
-            background: [19, 23, 28],
-            surface: [26, 31, 38],
-            text: [239, 240, 244],
-            muted: [156, 169, 181],
-            divider: [43, 51, 61],
-            accent: [131, 171, 248],
-            cpu: [100, 205, 215],
-            memory: [119, 214, 183],
-            gpu: [233, 182, 112],
-            network: [112, 176, 242],
-            danger: [241, 119, 132],
+            background: [27, 28, 31],
+            surface: [33, 34, 38],
+            text: [236, 237, 240],
+            muted: [164, 166, 174],
+            divider: [54, 56, 62],
+            accent: [64, 196, 190],
+            cpu: [64, 159, 227],
+            memory: [33, 178, 131],
+            gpu: [210, 149, 42],
+            network: [159, 128, 238],
+            storage: [226, 98, 142],
+            battery: [134, 177, 58],
+            danger: [255, 107, 98],
             font: FontChoice::System,
             font_size: 13.0,
         }
@@ -150,33 +167,76 @@ impl Theme {
     pub fn light() -> Self {
         Self {
             name: "Paper".into(),
-            background: [242, 243, 246],
+            background: [241, 241, 244],
             surface: [255, 255, 255],
-            text: [31, 34, 42],
-            muted: [96, 101, 115],
-            divider: [216, 219, 227],
-            accent: [107, 80, 206],
-            cpu: [107, 80, 206],
-            memory: [27, 126, 104],
-            gpu: [166, 94, 33],
-            network: [39, 112, 186],
-            danger: [186, 49, 68],
+            text: [29, 30, 34],
+            muted: [92, 95, 104],
+            divider: [224, 225, 230],
+            accent: [8, 122, 130],
+            cpu: [31, 120, 200],
+            memory: [14, 138, 98],
+            gpu: [178, 106, 0],
+            network: [122, 85, 214],
+            storage: [198, 63, 120],
+            battery: [95, 138, 18],
+            danger: [200, 50, 43],
             ..Self::dark()
         }
     }
     pub fn midnight() -> Self {
         Self {
             name: "Midnight".into(),
-            background: [13, 20, 31],
-            surface: [19, 29, 44],
-            text: [230, 239, 251],
-            muted: [148, 167, 190],
-            divider: [35, 49, 68],
-            accent: [112, 176, 242],
+            background: [14, 20, 33],
+            surface: [20, 28, 44],
+            text: [230, 236, 248],
+            muted: [150, 165, 190],
+            divider: [38, 48, 68],
             ..Self::dark()
         }
     }
+    pub fn ember() -> Self {
+        Self {
+            name: "Ember".into(),
+            background: [26, 23, 22],
+            surface: [35, 31, 30],
+            text: [245, 239, 230],
+            muted: [177, 162, 151],
+            divider: [62, 52, 47],
+            accent: [242, 160, 105],
+            ..Self::dark()
+        }
+    }
+    /// Colors of the presets shipped before the recorder redesign. A saved theme
+    /// that still matches one has not been customized, so it can move to the
+    /// current preset without touching anyone's own colors.
+    fn migrated_preset(&self) -> Option<Self> {
+        type Legacy = ([u8; 3], [u8; 3], [u8; 3], [u8; 3]);
+        const GRAPHITE: Legacy = ([19, 23, 28], [26, 31, 38], [43, 51, 61], [131, 171, 248]);
+        const EARLY_GRAPHITE: Legacy = ([20, 21, 24], [29, 30, 34], [49, 51, 58], [159, 143, 255]);
+        const PAPER: Legacy = (
+            [242, 243, 246],
+            [255, 255, 255],
+            [216, 219, 227],
+            [107, 80, 206],
+        );
+        const MIDNIGHT: Legacy = ([13, 20, 31], [19, 29, 44], [35, 49, 68], [112, 176, 242]);
+        let colors = (self.background, self.surface, self.divider, self.accent);
+        let preset = match self.name.as_str() {
+            "Graphite" if colors == GRAPHITE || colors == EARLY_GRAPHITE => Self::dark(),
+            "Paper" if colors == PAPER => Self::light(),
+            "Midnight" if colors == MIDNIGHT => Self::midnight(),
+            _ => return None,
+        };
+        Some(Self {
+            font: self.font,
+            font_size: self.font_size,
+            ..preset
+        })
+    }
     fn normalize(&mut self) {
+        if let Some(theme) = self.migrated_preset() {
+            *self = theme;
+        }
         self.name = bounded_name(&self.name, "Custom theme");
         self.font_size = finite_clamp(self.font_size, 11.0, 20.0, 13.0);
     }
@@ -207,29 +267,42 @@ pub struct Preferences {
     pub sections: Vec<SectionConfig>,
     pub saved_layouts: Vec<NamedLayout>,
     pub previous_layout: Option<Vec<SectionConfig>>,
+    /// Follow the system's light or dark setting with Paper and Graphite. The
+    /// field default is false so settings saved by older versions keep their theme.
+    #[serde(default)]
+    pub follow_system: bool,
+    /// Left, top, width and height of the window when it last moved.
+    pub window: Option<[f32; 4]>,
+    pub menu_bar_reading: MenuBarReading,
 }
 impl Default for Preferences {
     fn default() -> Self {
         Self {
             version: VERSION,
-            dashboard_title: "Your Mac, at a glance".into(),
+            dashboard_title: DEFAULT_TITLE.into(),
             dashboard_subtitle: "Understand what is using your Mac’s resources.".into(),
             custom_font_path: None,
             theme: Theme::default(),
             density: Density::default(),
             refresh_secs: 2,
             smooth_charts: false,
-            history_secs: 240,
+            history_secs: 300,
             sections: default_sections(),
             saved_layouts: Vec::new(),
             previous_layout: None,
+            follow_system: true,
+            window: None,
+            menu_bar_reading: MenuBarReading::default(),
         }
     }
 }
 impl Preferences {
     pub fn normalize(&mut self) {
         self.version = VERSION;
-        self.dashboard_title = bounded_name(&self.dashboard_title, "Your Mac, at a glance");
+        if self.dashboard_title == LEGACY_TITLE {
+            self.dashboard_title = DEFAULT_TITLE.into();
+        }
+        self.dashboard_title = bounded_name(&self.dashboard_title, DEFAULT_TITLE);
         self.dashboard_subtitle = bounded_text(
             &self.dashboard_subtitle,
             "Understand what is using your Mac’s resources.",
@@ -237,8 +310,15 @@ impl Preferences {
         );
         self.theme.normalize();
         self.refresh_secs = self.refresh_secs.clamp(1, 10);
-        self.history_secs = self.history_secs.clamp(30, 900);
+        self.history_secs = *HISTORY_RANGES
+            .iter()
+            .min_by_key(|range| range.abs_diff(self.history_secs))
+            .unwrap_or(&300);
+        self.window = self
+            .window
+            .filter(|w| w.iter().all(|v| v.is_finite()) && w[2] >= 900. && w[3] >= 600.);
         normalize_sections(&mut self.sections);
+        migrate_stock_layout(&mut self.sections);
         if let Some(previous) = &mut self.previous_layout {
             normalize_sections(previous);
         }
@@ -306,8 +386,12 @@ impl Preferences {
         }
         self.remember_layout();
         match name {
-            "Balanced" => self.sections = default_sections(),
+            "Balanced" => {
+                self.sections = default_sections();
+                self.density = Density::Comfortable;
+            }
             "Focus" => {
+                self.density = Density::Comfortable;
                 self.sections = [
                     SectionKind::Processor,
                     SectionKind::Memory,
@@ -332,7 +416,7 @@ impl Preferences {
             "Compact" => {
                 self.sections = default_sections();
                 for section in &mut self.sections {
-                    section.graph_height = 48.0;
+                    section.graph_height = 44.0;
                     section.details = false;
                 }
                 self.density = Density::Compact;
@@ -342,10 +426,57 @@ impl Preferences {
     }
 }
 fn default_sections() -> Vec<SectionConfig> {
-    SectionKind::ALL
-        .into_iter()
-        .map(SectionConfig::new)
-        .collect()
+    [
+        SectionKind::Processor,
+        SectionKind::Memory,
+        SectionKind::Graphics,
+        SectionKind::Network,
+        SectionKind::Storage,
+        SectionKind::Processes,
+        SectionKind::Battery,
+    ]
+    .into_iter()
+    .map(SectionConfig::new)
+    .collect()
+}
+/// Moves a layout nobody has arranged onto the recorder. It must still have the old
+/// default order, spans and wording, which the current defaults do not use, so a
+/// layout arranged since then is never touched. Chart height is kept, as it may
+/// have come from a density preset.
+fn migrate_stock_layout(sections: &mut Vec<SectionConfig>) {
+    let stock = sections.len() == SectionKind::ALL.len()
+        && sections
+            .iter()
+            .zip(SectionKind::ALL)
+            .all(|(section, kind)| {
+                let title = match kind {
+                    SectionKind::Network => "Internet & network",
+                    SectionKind::Battery => "Battery & cooling",
+                    _ => kind.title(),
+                };
+                let span = if kind == SectionKind::Processes {
+                    Span::Full
+                } else {
+                    Span::Half
+                };
+                section.kind == kind
+                    && section.title == title
+                    && section.description == kind.description()
+                    && section.span == span
+                    && section.visible
+                    && !section.details
+            });
+    if !stock {
+        return;
+    }
+    let height = sections[0].graph_height;
+    let uniform = sections.iter().all(|s| s.graph_height == height);
+    *sections = default_sections();
+    if uniform && height < 64. {
+        for section in sections.iter_mut() {
+            section.graph_height = height;
+        }
+    }
 }
 fn finite_clamp(value: f32, min: f32, max: f32, fallback: f32) -> f32 {
     if value.is_finite() {
@@ -373,7 +504,7 @@ fn normalize_sections(sections: &mut Vec<SectionConfig>) {
         }
         section.title = bounded_name(&section.title, section.kind.title());
         section.description = bounded_text(&section.description, section.kind.description(), 200);
-        section.graph_height = finite_clamp(section.graph_height, 40.0, 240.0, 90.0);
+        section.graph_height = finite_clamp(section.graph_height, 40.0, 240.0, 64.0);
         true
     });
     for kind in SectionKind::ALL {
@@ -576,6 +707,82 @@ mod tests {
             let _ = fs::remove_dir_all(&self.0);
         }
     }
+    fn legacy_sections() -> Vec<SectionConfig> {
+        SectionKind::ALL
+            .into_iter()
+            .map(|kind| {
+                let mut section = SectionConfig::new(kind);
+                section.span = if kind == SectionKind::Processes {
+                    Span::Full
+                } else {
+                    Span::Half
+                };
+                section.graph_height = 48.;
+                match kind {
+                    SectionKind::Network => section.title = "Internet & network".into(),
+                    SectionKind::Battery => section.title = "Battery & cooling".into(),
+                    _ => {}
+                }
+                section
+            })
+            .collect()
+    }
+
+    #[test]
+    fn stock_layouts_move_to_the_recorder_and_stay_there() {
+        let mut preferences = Preferences {
+            sections: legacy_sections(),
+            ..Preferences::default()
+        };
+        preferences.normalize();
+        assert_eq!(preferences.sections[0].span, Span::Full);
+        assert_eq!(preferences.sections[0].graph_height, 48.);
+        assert_eq!(preferences.sections[3].title, "Network");
+        assert_eq!(preferences.sections[5].kind, SectionKind::Processes);
+        let once = preferences.sections.clone();
+        preferences.normalize();
+        assert_eq!(preferences.sections, once);
+    }
+
+    #[test]
+    fn arranged_layouts_are_left_alone() {
+        let mut renamed = legacy_sections();
+        renamed[0].title = "Chip".into();
+        let mut moved = legacy_sections();
+        moved.swap(0, 1);
+        let mut hidden = legacy_sections();
+        hidden[2].visible = false;
+        for sections in [renamed, moved, hidden] {
+            let mut preferences = Preferences {
+                sections: sections.clone(),
+                ..Preferences::default()
+            };
+            preferences.normalize();
+            assert_eq!(preferences.sections, sections);
+        }
+    }
+
+    #[test]
+    fn only_untouched_stock_themes_are_migrated() {
+        let mut stock = Theme {
+            background: [20, 21, 24],
+            surface: [29, 30, 34],
+            divider: [49, 51, 58],
+            accent: [159, 143, 255],
+            font_size: 15.,
+            ..Theme::dark()
+        };
+        stock.normalize();
+        assert_eq!(stock.background, Theme::dark().background);
+        assert_eq!(stock.font_size, 15.);
+        let mut custom = Theme {
+            background: [1, 2, 3],
+            ..Theme::dark()
+        };
+        custom.normalize();
+        assert_eq!(custom.background, [1, 2, 3]);
+    }
+
     #[test]
     fn customizations_survive_storage_and_exports() {
         let temp = Temp::new();
@@ -680,7 +887,7 @@ mod tests {
         assert_eq!(preferences.sections[0].kind, SectionKind::Memory);
         assert!(!preferences.sections[0].visible);
         assert_eq!(preferences.sections[0].title.chars().count(), 80);
-        assert_eq!(preferences.sections[0].graph_height, 90.0);
+        assert_eq!(preferences.sections[0].graph_height, 64.0);
         assert_eq!(preferences.saved_layouts.len(), 20);
         for section in &mut preferences.sections {
             section.visible = false;

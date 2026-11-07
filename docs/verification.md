@@ -1,5 +1,21 @@
 # Verification
 
+## Recorder redesign, 2026-11-06
+
+Verified on an Apple M4 Mac with 16 GiB RAM and macOS 27.2. Sections below this one describe the earlier interface.
+
+`cargo test --locked` passes all 51 tests, and `cargo clippy --locked --all-targets -- -D warnings` is clean. New tests cover verdict rules, app grouping, settings migration, chart scaling, scrubbing, and interface filtering.
+
+`scripts/verify_gpui.py` passes against the real window. It checks scrubbing, keyboard navigation, search, tree view, the inspector, and native sheets for STOP, CONT, and TERM, comparing the outcome with the disposable child's actual OS state. It also covers pause, close to the menu bar, and reopening. `scripts/verify_tray.py` passes for the menu bar panel. `scripts/verify_metrics.py` passes for the collectors.
+
+Other checks were run by hand against the native window. A real 10-process CPU load changed the verdict to "Your Mac is working hard" and named the process. Real pointer drags reordered and resized sections, and the saved file and a relaunch confirmed both. Paper, 18-point text at the minimum window size, half-width sections, Tab focus, and Space activation were reviewed from captures.
+
+Not verified: a Mac without a battery, Intel Macs (unsupported), Reduce Motion enabled, thermal and memory-pressure verdicts on real hardware events (covered by unit tests only), the native font and file pickers, and very long sessions.
+
+Vision OCR misreads sparse numeric columns, so a few table controls in `verify_gpui.py` are driven by layout position.
+
+## Earlier interface
+
 The GPUI redesign was verified locally on 2026-10-16 on an Apple M4 Mac with 10 logical cores, 16 GiB RAM, and macOS 27.0.1.
 
 ## Build and behavior

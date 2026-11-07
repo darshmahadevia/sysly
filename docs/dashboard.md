@@ -1,17 +1,52 @@
 # Dashboard
 
-Sysly is a native macOS GPUI workspace for current activity, resource history, and process inspection. The visual direction is recorded in [DESIGN.md](../DESIGN.md). The accepted redesign brief is in [direction.md](../artifacts/redesign/direction.md).
+Sysly is a native macOS GPUI app. It says how your Mac is doing in one sentence, then shows the evidence. The visual direction is recorded in [DESIGN.md](../DESIGN.md).
 
-The left sidebar opens Overview, Apps & processes, Appearance, and individual resources. Resource shortcuts include live readings. The header holds the current page title and sampling controls. The bottom status line reports sampling state and uptime.
+The sidebar opens Overview, Apps & processes, each resource, and Settings. Each resource row has a live sparkline and reading. The toolbar shows the page title, sampling state, and Pause. On Overview it also holds Customize.
 
-Overview presents configurable sections for processor, memory, graphics, network, storage, battery, and processes. Adjacent half-width sections share a row. Full-width sections occupy their own row. The workspace scrolls vertically, including at the minimum window size of 1000 by 700 logical pixels. View details opens a resource page with additional measurements.
+## Overview
 
-Apps & processes provides search by name, PID, or user, sortable columns, and a tree view that retains matching processes' ancestry. Select a process to inspect its identity, resource use, and command. Each signal requires a separate confirmation.
+The verdict at the top is a plain sentence. It changes for heat, memory pressure, a nearly full startup disk, a nearly empty battery, sustained processor load, and single busy apps. CPU uses a 30-second average, so one spike cannot flip it. When the sentence names an app, a button opens it. High memory use alone is not reported as a problem, because memory pressure is what predicts slowdowns.
 
-Appearance has three tabs. Appearance controls palettes, individual colors, font selection, and text size. Layout & text controls dashboard copy, section visibility, ordering, width, chart height, and named layouts. Charts & menu bar controls history, refresh rate, density, and menu bar readings. Layout editors support drag ordering and chart resize handles alongside button controls. Themes and layouts can be imported and exported separately.
+Below it, full-width sections join into the recorder: one panel with one time axis. Choose 1, 5, or 15 minutes. Sysly keeps 15 minutes of samples, so changing the range never loses history. Hover over any chart to scrub. Every lane shows its reading from that moment, and the heading says what was busiest then. Select a lane to open that resource.
 
-Keyboard shortcuts are Command-1 for Overview, Command-2 for Apps & processes, Command-Comma for Appearance, and Command-F for process search. Escape dismisses the active overlay. Command-Q quits.
+## Resource pages
 
-The menu bar keeps CPU and memory summaries available when the window is closed. Its menu reopens Sysly, pauses or resumes sampling, and quits. If menu bar initialization fails, closing the window quits the app.
+Each resource page has a large chart and the question that follows it. Processor shows a per-core strip that keeps a load hopping between cores visible. Memory breaks down what is in memory, shows pressure, and ranks what uses the most. Network lists real connections and lets you choose the one to chart. Storage shows volumes and ranks disk activity. Battery & power shows charge, health, power, and cooling.
 
-Native screenshots and review evidence belong in [artifacts/redesign](../artifacts/redesign/). The older `.impeccable/review` screenshots show the previous interface and are not evidence for this GPUI build.
+## Apps & processes
+
+By app folds helpers into their app and uses the app's real icon. All lists every process. Tree shows the hierarchy and keeps the ancestors of search matches. Search by name, PID, or user.
+
+Select a row to open the inspector beside the table. It stays open while you browse, and tracks CPU and memory from the moment you opened it. Quit, Force Quit, and Pause each ask in a native sheet first. For an app, signals go to its main process.
+
+## Customize
+
+Press Customize on the Overview, or Command-E. Drag a section by its handle, or to the drop zone at the end. Drag a bottom edge to change its height. Rename it, switch between Half and Full, or hide it. Hidden sections wait at the bottom. Presets offer Balanced, Focus, and Compact, with Undo.
+
+## Settings
+
+General covers sampling, density, and the menu bar reading. Appearance covers themes, text, and every color. Automatic follows the system's light or dark setting. Dashboard covers the title, saved layouts, and layout files. Themes and layouts import and export separately.
+
+## Keyboard
+
+| Shortcut | Action |
+| --- | --- |
+| Command-1 | Overview |
+| Command-2 | Apps & processes |
+| Command-3 to Command-8 | Processor, Memory, Graphics, Network, Storage, Battery & power |
+| Command-Comma | Settings |
+| Command-F | Search processes |
+| Command-P | Pause or resume sampling |
+| Command-E | Customize Overview |
+| Up and Down | Move through the process table |
+| Tab and Space | Move between and press controls |
+| Escape | Leave Customize, close the inspector, or clear search |
+| Command-W | Close to the menu bar |
+| Command-Q | Quit |
+
+The native menu bar lists these commands too.
+
+## Menu bar
+
+Closing the window keeps Sysly in the menu bar. Its panel shows the same verdict, with processor, memory, graphics, and network readings. It reopens Sysly, pauses or resumes sampling, and quits. Settings can add a live processor or memory reading next to the icon. If menu bar initialization fails, closing the window quits the app.

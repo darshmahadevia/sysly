@@ -1,5 +1,7 @@
 mod app;
 mod collector;
+mod icons;
+mod insight;
 mod model;
 mod monitor;
 mod preferences;
@@ -26,15 +28,26 @@ fn main() {
             gpui_component::init(cx);
             gpui_component::Theme::change(gpui_component::ThemeMode::Dark, None, cx);
             app::bind_keys(cx);
-            let bounds = Bounds::centered(None, size(px(1320.), px(900.)), cx);
+            let saved = preferences::Store::new().load().0.window;
+            let bounds = saved
+                .map(|[x, y, width, height]| {
+                    Bounds::new(point(px(x), px(y)), size(px(width), px(height)))
+                })
+                .filter(|bounds| {
+                    cx.displays()
+                        .iter()
+                        .any(|display| display.bounds().intersects(bounds))
+                })
+                .unwrap_or_else(|| Bounds::centered(None, size(px(1320.), px(900.)), cx));
             cx.open_window(
                 WindowOptions {
                     window_bounds: Some(WindowBounds::Windowed(bounds)),
-                    window_min_size: Some(size(px(1000.), px(700.))),
+                    window_background: WindowBackgroundAppearance::Blurred,
+                    window_min_size: Some(size(px(960.), px(640.))),
                     titlebar: Some(TitlebarOptions {
                         title: Some("Sysly".into()),
                         appears_transparent: true,
-                        ..Default::default()
+                        traffic_light_position: Some(point(px(17.), px(19.))),
                     }),
                     ..Default::default()
                 },

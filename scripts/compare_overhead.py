@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import signal
 import statistics
 import subprocess
 import sys
@@ -65,11 +66,14 @@ for run in range(args.runs):
                     try:
                         drive(process.pid, "key", "q", "cmd")
                         process.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        # Builds without a native menu may not receive Command-Q here.
+                        pass
                     finally:
                         if process.poll() is None:
                             process.terminate()
                             process.wait(timeout=10)
-            assert process.returncode == 0, f"Sysly exited with {process.returncode}"
+            assert process.returncode in (0, -signal.SIGTERM), f"Sysly exited with {process.returncode}"
         (args.output / "report.json").write_text(json.dumps(report, indent=2) + "\n")
 
 report["summary"] = {}

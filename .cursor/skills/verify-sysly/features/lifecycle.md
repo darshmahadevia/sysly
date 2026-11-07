@@ -6,7 +6,7 @@ Live/paused state, refresh interval, retained history, menu bar choices, close-t
 
 ## How to get to it (user POV)
 
-Use Pause/Resume in the dashboard or menu bar. Close the window and reopen it from Open Sysly in the menu bar.
+Use Pause in the toolbar, Command-P, or the menu bar. Close the window and reopen it from Open Sysly in the menu bar.
 
 ## Driving it with native Accessibility
 

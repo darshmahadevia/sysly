@@ -111,7 +111,7 @@ case "bounds":
     print(String(data: try JSONSerialization.data(withJSONObject: bounds, options: [.sortedKeys]), encoding: .utf8)!)
 case "key":
     guard args.count > 3 else { fatalError("Missing key") }
-    let keys: [String: CGKeyCode] = ["1": 18, "2": 19, "3": 20, ",": 43, "f": 3, "q": 12, "a": 0, "escape": 53, "return": 36, "tab": 48, "space": 49, "delete": 51]
+    let keys: [String: CGKeyCode] = ["1": 18, "2": 19, "3": 20, "4": 21, "5": 23, "6": 22, "7": 26, "8": 28, ",": 43, "f": 3, "q": 12, "a": 0, "p": 35, "e": 14, "w": 13, "escape": 53, "return": 36, "tab": 48, "space": 49, "delete": 51, "down": 125, "up": 126]
     guard let code = keys[args[3]] else { fatalError("Unsupported key") }
     let modifiers = args.dropFirst(4).map { modifier -> String in
         switch modifier {
@@ -137,7 +137,7 @@ case "type":
     try script.run()
     script.waitUntilExit()
     guard script.terminationStatus == 0 else { fatalError("Text input failed") }
-case "point", "scroll":
+case "point", "scroll", "hover":
     guard args.count > 4, let x = Double(args[3]), let y = Double(args[4]) else { fatalError("Missing window-relative coordinates") }
     let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
     guard let window = windows.first(where: { ($0[kCGWindowOwnerPID as String] as? Int32) == pid && ($0[kCGWindowLayer as String] as? Int) == 0 }),
@@ -146,7 +146,10 @@ case "point", "scroll":
     let point = CGPoint(x: left + x, y: top + y)
     pointer(.mouseMoved, point)
     Thread.sleep(forTimeInterval: 0.1)
-    if args[2] == "point" {
+    if args[2] == "hover" {
+        // Leaves the pointer in place so a hover state can be captured.
+        pointer(.mouseMoved, CGPoint(x: point.x + 1, y: point.y))
+    } else if args[2] == "point" {
         pointer(.leftMouseDown, point)
         Thread.sleep(forTimeInterval: 0.08)
         pointer(.leftMouseUp, point)
@@ -154,6 +157,24 @@ case "point", "scroll":
         guard args.count > 5, let delta = Int32(args[5]) else { fatalError("Missing scroll distance") }
         CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: delta, wheel2: 0, wheel3: 0)?.post(tap: .cghidEventTap)
     }
+case "drag-point":
+    guard args.count > 6, let x1 = Double(args[3]), let y1 = Double(args[4]), let x2 = Double(args[5]), let y2 = Double(args[6]) else { fatalError("Missing window-relative drag coordinates") }
+    let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+    guard let window = windows.first(where: { ($0[kCGWindowOwnerPID as String] as? Int32) == pid && ($0[kCGWindowLayer as String] as? Int) == 0 }),
+          let bounds = window[kCGWindowBounds as String] as? [String: Double], let left = bounds["X"], let top = bounds["Y"] else { fatalError("Visible window not found") }
+    activate()
+    let start = CGPoint(x: left + x1, y: top + y1), end = CGPoint(x: left + x2, y: top + y2)
+    pointer(.mouseMoved, start)
+    Thread.sleep(forTimeInterval: 0.15)
+    pointer(.leftMouseDown, start)
+    Thread.sleep(forTimeInterval: 0.1)
+    for step in 1...14 {
+        let t = Double(step) / 14
+        pointer(.leftMouseDragged, CGPoint(x: start.x + (end.x - start.x) * t, y: start.y + (end.y - start.y) * t))
+        Thread.sleep(forTimeInterval: 0.03)
+    }
+    Thread.sleep(forTimeInterval: 0.15)
+    pointer(.leftMouseUp, end)
 case "file":
     guard args.count > 3 else { fatalError("Missing file path") }
     let deadline = Date().addingTimeInterval(5)

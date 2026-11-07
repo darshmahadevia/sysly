@@ -11,6 +11,8 @@ pub struct Snapshot {
     pub load: [f64; 3],
     pub uptime_secs: u64,
     pub memory: Memory,
+    #[serde(default)]
+    pub thermal: Thermal,
     pub hardware: Hardware,
     pub battery: Option<Battery>,
     pub networks: Vec<Network>,
@@ -26,6 +28,43 @@ pub struct Memory {
     pub available: u64,
     pub swap_total: u64,
     pub swap_used: u64,
+    /// Breakdown from the Mach VM counters. `None` when the kernel call fails.
+    #[serde(default)]
+    pub composition: Option<MemoryComposition>,
+    #[serde(default)]
+    pub pressure: Pressure,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MemoryComposition {
+    pub app: u64,
+    pub wired: u64,
+    pub compressed: u64,
+    pub cached: u64,
+    pub free: u64,
+}
+
+/// The kernel's own memory pressure level, which is what actually predicts slowdowns.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Pressure {
+    #[default]
+    Unknown,
+    Normal,
+    Warning,
+    Critical,
+}
+
+/// `NSProcessInfo.thermalState`, the level at which macOS starts limiting performance.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Thermal {
+    #[default]
+    Unknown,
+    Nominal,
+    Fair,
+    Serious,
+    Critical,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]

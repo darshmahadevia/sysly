@@ -34,7 +34,6 @@ struct TraySummary {
     memory: Option<f32>,
     memory_detail: String,
     gpu: Option<f32>,
-    network_detail: String,
     download: String,
     upload: String,
 }
@@ -64,7 +63,7 @@ impl TraySummary {
                 .then(|| snapshot.memory.used as f32 / snapshot.memory.total as f32 * 100.),
             memory_detail: if ready && snapshot.memory.total > 0 {
                 format!(
-                    "{} of {} used",
+                    "{} of {}",
                     bytes(snapshot.memory.used as f64),
                     bytes(snapshot.memory.total as f64)
                 )
@@ -72,17 +71,14 @@ impl TraySummary {
                 "Waiting for memory data".into()
             },
             gpu: snapshot.hardware.gpu_percent,
-            network_detail: network
-                .map(|n| format!("{} · download / upload", n.name))
-                .unwrap_or_else(|| "No active interface".into()),
             download: network
                 .filter(|_| ready)
-                .map(|n| format!("{} /s", bytes(n.received_per_sec)))
-                .unwrap_or_else(|| "Unavailable".into()),
+                .map(|n| format!("{}/s", bytes(n.received_per_sec)))
+                .unwrap_or_else(|| "Not available".into()),
             upload: network
                 .filter(|_| ready)
-                .map(|n| format!("{} /s", bytes(n.sent_per_sec)))
-                .unwrap_or_else(|| "Unavailable".into()),
+                .map(|n| format!("{}/s", bytes(n.sent_per_sec)))
+                .unwrap_or_else(|| "Not available".into()),
         }
     }
 }
@@ -107,6 +103,7 @@ struct TrayState {
 
 pub struct Tray {
     _icon: TrayIcon,
+    title: RefCell<Option<String>>,
     pause: MenuItem,
     summary: Rc<SummaryView>,
     state: Rc<RefCell<TrayState>>,
@@ -119,7 +116,7 @@ impl Tray {
         let mtm = MainThreadMarker::new().ok_or("Menu bar must initialize on the main thread")?;
         let menu = Menu::new();
         let open = MenuItem::new("Open Sysly", true, None);
-        let pause = MenuItem::new("Pause sampling", true, None);
+        let pause = MenuItem::new("Pause Sampling", true, None);
         let quit = MenuItem::new("Quit Sysly", true, None);
         menu.append_items(&[
             &PredefinedMenuItem::separator(),
@@ -201,6 +198,7 @@ impl Tray {
         summary.update(&TraySummary::from_snapshot(&Snapshot::default(), ""), false);
         Ok(Self {
             _icon: icon,
+            title: RefCell::new(None),
             pause,
             summary,
             state,
@@ -209,7 +207,19 @@ impl Tray {
         })
     }
 
-    pub fn update(&self, snapshot: &Snapshot, interface: &str, paused: bool) {
+    pub fn update(
+        &self,
+        snapshot: &Snapshot,
+        interface: &str,
+        paused: bool,
+        reading: Option<String>,
+        verdict: (&str, &str),
+    ) {
+        self.summary.set_verdict(verdict.0, verdict.1);
+        if *self.title.borrow() != reading {
+            self._icon.set_title(reading.as_deref());
+            *self.title.borrow_mut() = reading;
+        }
         *self.state.borrow_mut() = TrayState {
             interface: interface.into(),
             paused,
@@ -217,9 +227,9 @@ impl Tray {
         self.summary
             .update(&TraySummary::from_snapshot(snapshot, interface), paused);
         self.pause.set_text(if paused {
-            "Resume sampling"
+            "Resume Sampling"
         } else {
-            "Pause sampling"
+            "Pause Sampling"
         });
     }
 
@@ -241,106 +251,93 @@ struct MetricView {
     y: f64,
 }
 
+const WIDTH: f64 = 320.;
+const INSET: f64 = 14.;
+const CONTENT: f64 = WIDTH - INSET * 2.;
+
+fn srgb(red: u8, green: u8, blue: u8) -> Retained<NSColor> {
+    NSColor::colorWithSRGBRed_green_blue_alpha(
+        red as f64 / 255.,
+        green as f64 / 255.,
+        blue as f64 / 255.,
+        1.,
+    )
+}
+
 struct SummaryView {
     view: Retained<NSView>,
+    headline: Retained<NSTextField>,
+    explanation: Retained<NSTextField>,
     status: Retained<NSTextField>,
     cpu: MetricView,
     memory: MetricView,
     gpu: MetricView,
     network: Retained<NSTextField>,
-    download: Retained<NSTextField>,
-    upload: Retained<NSTextField>,
     sequence: Cell<u64>,
     updated: RefCell<String>,
 }
 
 impl SummaryView {
     fn new(mtm: MainThreadMarker) -> Self {
-        let view = NSView::initWithFrame(NSView::alloc(mtm), rect(0., 0., 320., 350.));
-        label(
+        let view = NSView::initWithFrame(NSView::alloc(mtm), rect(0., 0., WIDTH, 262.));
+        let headline = label(
             &view,
-            "Sysly",
-            rect(20., 314., 95., 22.),
+            "Checking your Mac…",
+            rect(INSET, 228., CONTENT, 24.),
             16.,
-            true,
+            false,
             false,
             mtm,
         );
+        if let Some(font) = NSFont::fontWithName_size(&NSString::from_str("New York"), 16.) {
+            headline.setFont(Some(&font));
+        }
+        let explanation = NSTextField::wrappingLabelWithString(&NSString::from_str(""), mtm);
+        explanation.setFrame(rect(INSET, 188., CONTENT, 38.));
+        explanation.setFont(Some(&NSFont::systemFontOfSize(12.)));
+        explanation.setTextColor(Some(&NSColor::secondaryLabelColor()));
+        explanation.setSelectable(false);
+        view.addSubview(&explanation);
+        let cpu = MetricView::new(&view, "Processor", 144., srgb(64, 159, 227), mtm);
+        let memory = MetricView::new(&view, "Memory", 104., srgb(33, 178, 131), mtm);
+        let gpu = MetricView::new(&view, "Graphics", 64., srgb(210, 149, 42), mtm);
+        label(
+            &view,
+            "Network",
+            rect(INSET, 34., 90., 17.),
+            12.,
+            false,
+            false,
+            mtm,
+        );
+        let network = label(&view, "", rect(100., 34., 202., 17.), 12., true, false, mtm);
+        network.setAlignment(NSTextAlignment::Right);
         let status = label(
             &view,
             "Collecting first sample…",
-            rect(108., 316., 192., 17.),
-            10.,
-            false,
-            true,
-            mtm,
-        );
-        let cpu = MetricView::new(
-            &view,
-            "CPU",
-            "Processor activity",
-            240.,
-            NSColor::systemTealColor(),
-            mtm,
-        );
-        let memory = MetricView::new(
-            &view,
-            "MEM",
-            "Memory in use",
-            166.,
-            NSColor::systemGreenColor(),
-            mtm,
-        );
-        let gpu = MetricView::new(
-            &view,
-            "GPU",
-            "Graphics activity",
-            92.,
-            NSColor::systemOrangeColor(),
-            mtm,
-        );
-        label(
-            &view,
-            "NET",
-            rect(20., 61., 55., 18.),
+            rect(INSET, 10., CONTENT, 15.),
             11.,
-            true,
-            false,
-            mtm,
-        );
-        let network = label(&view, "", rect(75., 61., 225., 17.), 10., false, true, mtm);
-        label(
-            &view,
-            "Download",
-            rect(20., 38., 120., 14.),
-            10.,
             false,
             true,
             mtm,
         );
-        label(
-            &view,
-            "Upload",
-            rect(170., 38., 130., 14.),
-            10.,
-            false,
-            true,
-            mtm,
-        );
-        let download = label(&view, "", rect(20., 14., 135., 23.), 15., true, false, mtm);
-        let upload = label(&view, "", rect(170., 14., 130., 23.), 15., true, false, mtm);
         Self {
             view,
+            headline,
+            explanation,
             status,
             cpu,
             memory,
             gpu,
             network,
-            download,
-            upload,
             sequence: Cell::new(0),
             updated: RefCell::new(String::new()),
         }
+    }
+
+    fn set_verdict(&self, headline: &str, detail: &str) {
+        set_text(&self.headline, headline);
+        set_text(&self.explanation, detail);
     }
 
     fn update(&self, summary: &TraySummary, paused: bool) {
@@ -358,35 +355,20 @@ impl SummaryView {
             );
         }
         let status = if paused {
-            "Paused · last readings".into()
+            format!("Paused, showing readings from {}", self.updated.borrow())
         } else if summary.sequence == 0 {
             "Collecting first sample…".into()
         } else {
-            format!("Live · updated {}", self.updated.borrow())
+            format!("Updated {}", self.updated.borrow())
         };
         set_text(&self.status, &status);
-        self.cpu.update(
-            summary.cpu,
-            if summary.sequence == 0 {
-                "Waiting for processor data"
-            } else {
-                "Processor activity"
-            },
-        );
+        self.cpu.update(summary.cpu, "");
         self.memory.update(summary.memory, &summary.memory_detail);
-        self.gpu.update(
-            summary.gpu,
-            if summary.gpu.is_some() {
-                "Graphics activity"
-            } else if summary.sequence == 0 {
-                "Waiting for graphics data"
-            } else {
-                "Graphics data unavailable"
-            },
+        self.gpu.update(summary.gpu, "");
+        set_text(
+            &self.network,
+            &format!("↓ {}   ↑ {}", summary.download, summary.upload),
         );
-        set_text(&self.network, &summary.network_detail);
-        set_text(&self.download, &summary.download);
-        set_text(&self.upload, &summary.upload);
     }
 }
 
@@ -394,7 +376,6 @@ impl MetricView {
     fn new(
         parent: &NSView,
         name: &str,
-        description: &str,
         y: f64,
         color: Retained<NSColor>,
         mtm: MainThreadMarker,
@@ -402,17 +383,17 @@ impl MetricView {
         label(
             parent,
             name,
-            rect(20., y + 30., 70., 18.),
-            11.,
-            true,
+            rect(INSET, y + 12., 90., 17.),
+            12.,
+            false,
             false,
             mtm,
         );
         let value = label(
             parent,
             "",
-            rect(145., y + 27., 155., 23.),
-            17.,
+            rect(WIDTH - INSET - 90., y + 12., 90., 17.),
+            12.,
             true,
             false,
             mtm,
@@ -420,20 +401,21 @@ impl MetricView {
         value.setAlignment(NSTextAlignment::Right);
         let detail = label(
             parent,
-            description,
-            rect(20., y + 10., 280., 16.),
+            "",
+            rect(100., y + 12., 150., 17.),
             11.,
             false,
             true,
             mtm,
         );
+        detail.setAlignment(NSTextAlignment::Right);
         meter(
             parent,
-            rect(20., y, 280., 4.),
+            rect(INSET, y + 3., CONTENT, 4.),
             &NSColor::quaternaryLabelColor(),
             mtm,
         );
-        let fill = meter(parent, rect(20., y, 0., 4.), &color, mtm);
+        let fill = meter(parent, rect(INSET, y + 3., 0., 4.), &color, mtm);
         Self {
             value,
             detail,
@@ -447,13 +429,13 @@ impl MetricView {
             &self.value,
             &percent
                 .map(|v| format!("{v:.0}%"))
-                .unwrap_or_else(|| "Unavailable".into()),
+                .unwrap_or_else(|| "Not available".into()),
         );
         set_text(&self.detail, detail);
         self.fill.setFrame(rect(
-            20.,
-            self.y,
-            percent.unwrap_or(0.).clamp(0., 100.) as f64 * 2.8,
+            INSET,
+            self.y + 3.,
+            percent.unwrap_or(0.).clamp(0., 100.) as f64 / 100. * CONTENT,
             4.,
         ));
     }
@@ -516,7 +498,7 @@ mod tests {
         assert_eq!(waiting.cpu, None);
         assert_eq!(waiting.memory, None);
         assert_eq!(waiting.gpu, None);
-        assert_eq!(waiting.download, "Unavailable");
+        assert_eq!(waiting.download, "Not available");
         snapshot.sequence = 1;
         snapshot.cpu_percent = 12.;
         snapshot.memory = Memory {
@@ -541,17 +523,17 @@ mod tests {
         let summary = TraySummary::from_snapshot(&snapshot, "en0");
         assert_eq!(summary.cpu, Some(12.));
         assert_eq!(summary.memory, Some(25.));
-        assert_eq!(summary.memory_detail, "4.0 GB of 16.0 GB used");
+        assert_eq!(summary.memory_detail, "4.0 GB of 16.0 GB");
         assert_eq!(summary.gpu, None);
-        assert_eq!(summary.download, "2 KB /s");
-        assert_eq!(summary.upload, "1 KB /s");
+        assert_eq!(summary.download, "2 KB/s");
+        assert_eq!(summary.upload, "1 KB/s");
         assert_eq!(
             TraySummary::from_snapshot(&snapshot, "en1").download,
-            "0 B /s"
+            "0 B/s"
         );
         assert_eq!(
             TraySummary::from_snapshot(&snapshot, "gone").download,
-            "Unavailable"
+            "Not available"
         );
     }
 }

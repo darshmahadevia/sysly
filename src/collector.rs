@@ -1,5 +1,6 @@
 use crate::model::{
-    Battery, Disk, Hardware, Memory, Network, Process, ProcessAction, ProcessKey, Snapshot,
+    Battery, Disk, Hardware, Memory, MemoryComposition, Network, Pressure, Process, ProcessAction,
+    ProcessKey, Snapshot, Thermal,
 };
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -87,7 +88,7 @@ impl Collector {
                 Ok(metrics) => {
                     let positive = |value: f32| (value.is_finite() && value > 0.0).then_some(value);
                     Hardware {
-                        status: "IOReport · GPU active residency · power estimates".into(),
+                        status: "Connected. Power figures are estimates.".into(),
                         cpu_temp: metrics.temp.cpu_temp_avg,
                         gpu_temp: metrics.temp.gpu_temp_avg,
                         gpu_percent: (sampler.get_soc_info().gpu_freqs.len() > 1
@@ -213,7 +214,7 @@ impl Collector {
                     )
                     .unwrap_or_default();
                 if !available {
-                    warnings.push(format!("Disk IO counters unavailable for {mount}"));
+                    warnings.push(format!("{mount} does not report disk activity."));
                 }
                 Disk {
                     name: disk.name().to_string_lossy().into_owned(),
@@ -233,7 +234,7 @@ impl Collector {
             > 1
         {
             warnings.push(
-                "APFS volumes may share physical disk IO counters; do not sum volume throughput"
+                "Volumes on the same disk share activity counters, so their figures overlap."
                     .into(),
             );
         }
@@ -311,7 +312,10 @@ impl Collector {
                 available: self.system.available_memory(),
                 swap_total: self.system.total_swap(),
                 swap_used: self.system.used_swap(),
+                composition: memory_composition(),
+                pressure: memory_pressure(),
             },
+            thermal: thermal_state(),
             hardware,
             battery: self.battery.clone(),
             networks,
@@ -332,6 +336,69 @@ impl Collector {
                 self.battery_warning = Some(format!("Battery unavailable: {error}"));
             }
         }
+    }
+}
+
+/// Reads the same Mach VM counters Activity Monitor groups into App, Wired,
+/// Compressed and Cached Files.
+fn memory_composition() -> Option<MemoryComposition> {
+    #[allow(deprecated)]
+    let host = unsafe { libc::mach_host_self() };
+    let mut stats: libc::vm_statistics64 = unsafe { std::mem::zeroed() };
+    let mut count = libc::HOST_VM_INFO64_COUNT;
+    let result = unsafe {
+        libc::host_statistics64(
+            host,
+            libc::HOST_VM_INFO64,
+            (&raw mut stats).cast(),
+            &raw mut count,
+        )
+    };
+    if result != libc::KERN_SUCCESS {
+        return None;
+    }
+    let page = unsafe { libc::sysconf(libc::_SC_PAGESIZE) }.max(0) as u64;
+    let pages = |count: u64| count.saturating_mul(page);
+    let purgeable = stats.purgeable_count as u64;
+    Some(MemoryComposition {
+        app: pages((stats.internal_page_count as u64).saturating_sub(purgeable)),
+        wired: pages(stats.wire_count as u64),
+        compressed: pages(stats.compressor_page_count as u64),
+        cached: pages(stats.external_page_count as u64 + purgeable),
+        free: pages((stats.free_count as u64).saturating_sub(stats.speculative_count as u64)),
+    })
+}
+
+fn memory_pressure() -> Pressure {
+    let mut level: libc::c_int = 0;
+    let mut size = std::mem::size_of_val(&level);
+    let result = unsafe {
+        libc::sysctlbyname(
+            c"kern.memorystatus_vm_pressure_level".as_ptr(),
+            (&raw mut level).cast(),
+            &raw mut size,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    match (result, level) {
+        (0, 1) => Pressure::Normal,
+        (0, 2) => Pressure::Warning,
+        (0, 4) => Pressure::Critical,
+        _ => Pressure::Unknown,
+    }
+}
+
+fn thermal_state() -> Thermal {
+    use objc2::{class, msg_send, rc::Retained, runtime::AnyObject};
+    let info: Retained<AnyObject> = unsafe { msg_send![class!(NSProcessInfo), processInfo] };
+    let state: isize = unsafe { msg_send![&*info, thermalState] };
+    match state {
+        0 => Thermal::Nominal,
+        1 => Thermal::Fair,
+        2 => Thermal::Serious,
+        3 => Thermal::Critical,
+        _ => Thermal::Unknown,
     }
 }
 

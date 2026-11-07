@@ -6,13 +6,17 @@ Sysly uses Rust GPUI 0.2.2 with gpui-component 0.5.1 and a native AppKit-backed 
 
 `main.rs` handles the sampling CLI before GUI startup. It initializes GPUI, component assets, the dark control theme, key bindings, and the root window.
 
-`app.rs` has one root `App` entity. The root owns the monitor, current `Arc<Snapshot>`, bounded history, preferences, store, tray, selected page, and typed process overlay. Stateless render functions compose cards and charts. Dedicated `InputState` entities own text editing and focus. The process list uses GPUI's virtualized `uniform_list`.
+`src/app/mod.rs` has one root `App` entity. It owns the monitor, current `Arc<Snapshot>`, bounded history, preferences, store, tray, selected page, and process selection. Screens are `impl App` blocks in sibling modules: `chrome.rs` (sidebar, toolbar, toasts), `overview.rs`, `detail.rs`, `processes.rs`, and `settings.rs`. `chart.rs` paints traces, and `style.rs` holds design tokens and primitives. The cheap `Ui` value carries the palette and type scale into closures.
 
-The root polls monitor and tray events every 200 milliseconds. A new snapshot updates history and the five-process overview summary. The process page builds its row index when open. History retains at most 902 samples and also respects the configured time span. Render closures share history through an `Arc`; per-core arrays are shared across copy-on-write history updates. Charts stream clipped points directly into their paths. Pauses mark a break before the next point. Missing values split traces rather than becoming zero.
+`src/insight.rs` is pure. It folds helpers into apps and turns readings into the verdict, so its wording and thresholds are unit tested. `src/icons.rs` loads real app icons on a background thread and reads the Reduce Motion setting.
 
-Charts update on samples by default. The optional `smooth_charts` setting interpolates the viewport and requests animation frames between samples. GPUI 0.2.2 propagates view invalidation to ancestors, so continuous chart scrolling also rebuilds the dashboard. Sample-driven charts avoid that work. Navigation retains its 180-millisecond opacity transition.
+The root polls monitor and tray events every 200 milliseconds. `App::record` computes everything derived from a sample once: history, app grouping, top consumers, and the verdict. Rendering then only reads. History retains at most 902 samples and 15 minutes, regardless of the range on screen. Render closures share history through an `Arc`. Pauses mark a break before the next point, and missing values split traces rather than becoming zero. Each history entry also records the busiest app, so the past can be questioned.
 
-The section vector is the source of order, visibility, width, chart height, and custom copy. Stable section IDs support drag ordering. Named layouts snapshot that vector. Appearance settings update the component theme and schedule a save after 400 milliseconds. The store also saves on root drop.
+Charts register their painted bounds in a shared list. The root's mouse handler maps a pointer position to the nearest sample and re-renders only when that sample changes.
+
+Charts update on samples by default. The optional `smooth_charts` setting interpolates the viewport and requests animation frames between samples. GPUI 0.2.2 propagates view invalidation to ancestors, so continuous chart scrolling also rebuilds the dashboard. Sample-driven charts avoid that work.
+
+The section vector is the source of order, visibility, width, chart height, and custom copy. Consecutive full-width chart sections render as recorder lanes. Named layouts snapshot that vector. Settings update the component theme and schedule a save after 400 milliseconds. The store also saves on root drop.
 
 ## Sampling and process actions
 
@@ -24,11 +28,11 @@ Process identity includes PID and start time. The signal boundary refreshes the 
 
 ## Data and persistence
 
-Data sources are sysinfo for CPU, memory, processes, networks, and disks, macmon for Apple Silicon hardware metrics, and native IOKit for battery properties. Battery and disk topology refresh every five seconds. User names are indexed by UID and refreshed every 60 seconds. Rates use monotonic observation time and counter identity. A reset establishes a fresh baseline.
+Data sources are sysinfo for CPU, memory, processes, networks, and disks, macmon for Apple Silicon hardware metrics, and native IOKit for battery properties. Mach VM counters supply memory composition, a sysctl supplies the kernel's memory pressure level, and `NSProcessInfo` supplies thermal state. Battery and disk topology refresh every five seconds. User names are indexed by UID and refreshed every 60 seconds. Rates use monotonic observation time and counter identity. A reset establishes a fresh baseline.
 
 `Snapshot.collected_ms` measures post-hardware OS collection. It excludes macmon processing and its sampling wait. It does not measure total application overhead.
 
-`preferences.rs` retains settings format version 1, normalization, bounded imports, named layouts, and atomic writes. Invalid settings fall back to defaults. Before overwriting an invalid file, the store preserves a backup. Reads and exports have a 1 MiB limit. Theme files carry palette and typography. Layout files carry section configuration. A custom font path stays local.
+`preferences.rs` retains settings format version 1, with new fields defaulted so older files still load. Stock themes saved by earlier versions move to the current presets, and customized themes are left alone. It also keeps normalization, bounded imports, named layouts, and atomic writes. Invalid settings fall back to defaults. Before overwriting an invalid file, the store preserves a backup. Reads and exports have a 1 MiB limit. Theme files carry palette and typography. Layout files carry section configuration. A custom font path stays local.
 
 ## Build and verification boundaries
 
@@ -36,4 +40,4 @@ The GPUI dependency enables `runtime_shaders` so this Command Line Tools install
 
 Release builds disable stripping for build-time procedural macro libraries to avoid the Rust macOS LINKEDIT alignment issue. The application executable retains the release profile's optimization and stripping settings.
 
-`scripts/verify_gpui.py PID` drives the real window through a Swift helper and Vision OCR. GPUI 0.2.2 does not expose content labels through macOS Accessibility. Native captures and review evidence live in `artifacts/redesign`. See [verification](verification.md) for results and limits.
+`scripts/verify_gpui.py PID` drives the real window through a Swift helper and Vision OCR. GPUI 0.2.2 does not expose content labels through macOS Accessibility. See [verification](verification.md) for results and limits.

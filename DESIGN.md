@@ -1,23 +1,25 @@
 ---
 name: Sysly
-description: A native macOS workspace for real system activity.
+description: A native macOS instrument that tells you how your Mac is doing, then shows why.
 colors:
-  background: "#13171c"
-  surface: "#1a1f26"
-  text: "#eff0f4"
-  muted: "#9ca9b5"
-  divider: "#2b333d"
-  accent: "#83abf8"
-  cpu: "#64cdd7"
-  memory: "#77d6b7"
-  gpu: "#e9b670"
-  network: "#70b0f2"
-  danger: "#f17784"
+  background: "#1b1c1f"
+  surface: "#212226"
+  text: "#ecedf0"
+  muted: "#a4a6ae"
+  divider: "#36383e"
+  accent: "#40c4be"
+  cpu: "#409fe3"
+  memory: "#21b283"
+  gpu: "#d2952a"
+  network: "#9f80ee"
+  storage: "#e2628e"
+  battery: "#86b13a"
+  danger: "#ff6b62"
 typography:
-  headline:
-    fontFamily: ".AppleSystemUIFont"
-    fontSize: "28px"
-    fontWeight: 600
+  verdict:
+    fontFamily: "New York"
+    fontSize: "30px"
+    fontWeight: 500
   title:
     fontFamily: ".AppleSystemUIFont"
     fontSize: "14px"
@@ -27,136 +29,101 @@ typography:
     fontSize: "13px"
   label:
     fontFamily: ".AppleSystemUIFont"
-    fontSize: "11px"
-  data:
-    fontFamily: "Menlo"
-    fontSize: "11px"
-  reading:
+    fontSize: "12px"
+  smallest:
     fontFamily: ".AppleSystemUIFont"
-    fontSize: "36px"
-    fontWeight: 500
+    fontSize: "11px"
+  figure:
+    fontFamily: ".AppleSystemUIFont"
+    fontFeature: "tnum"
 rounded:
+  segment: "5px"
   control: "7px"
-  navigation: "8px"
-  editor: "10px"
-  card: "14px"
+  panel: "12px"
 spacing:
-  control-gap: "8px"
-  row-gap: "12px"
-  section-gap: "16px"
-  compact-inset: "17px"
-  card-inset: "23px"
-  content-inset: "34px"
-components:
-  button:
-    backgroundColor: "rgb(43 51 61 / 45%)"
-    textColor: "{colors.text}"
-    rounded: "{rounded.control}"
-    height: "32px"
-    padding: "0 12px"
-  button-hover:
-    backgroundColor: "{colors.divider}"
-  navigation-active:
-    backgroundColor: "rgb(43 51 61 / 60%)"
-    textColor: "{colors.text}"
-    rounded: "{rounded.navigation}"
-    height: "41px"
-  section:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.text}"
-    rounded: "{rounded.card}"
-    padding: "{spacing.card-inset}"
+  panel-gap: "14px"
+  panel-inset: "16px"
+  compact-inset: "12px"
+  gutter: "24px"
 ---
 
 # Design System: Sysly
 
-## Overview
+## Concept
 
-**Creative North Star: "Your Mac, at a glance"**
+**Creative North Star: "The recorder"**
 
-Sysly presents system activity in a native Rust GPUI window. Graphite backgrounds, aligned readings, and resource colors give charts priority. The catalog-inspired direction uses spacing and typography to separate navigation, measurements, and actions.
+Sysly's mark is a trace with a sampling dot. The product follows it. Sysly is one instrument, not a wall of cards. It speaks one plain sentence about how the Mac is doing, then shows every resource on one shared time axis so that causes line up.
 
-These tokens record the default Graphite theme in `src/preferences.rs` and its application in `src/app.rs`. Saved themes, custom fonts, and layouts override defaults. Measurements use plain-language captions and explicit units.
+Two things make Sysly distinct, and everything else stays quiet so they can land.
 
-**Key Characteristics:**
-
-- A persistent sidebar with live resource readings.
-- Colored history traces and a segmented memory composition.
-- Tonal cards, rounded controls, and fine separators.
-- User-controlled appearance, copy, and section layout.
+- **The verdict.** A sentence in New York, the only serif in the app, answers "is my Mac OK?" and names the culprit when there is one. `src/insight.rs` owns the wording and thresholds.
+- **The scrub.** Hovering any chart moves one cursor across all of them. Each lane shows its reading from that moment, and the heading says what was busiest then.
 
 ## Colors
 
-### Primary
+Resource colors identify a resource everywhere: lanes, sparklines, meters, and the menu bar panel. They were checked with a categorical palette validator in both Graphite and Paper for color-blind separation, normal-vision separation, and contrast. The dark set sits slightly above the validator's lightness band on purpose, because it draws thin traces on graphite. Every lane also carries a text label, so identity never depends on color alone.
 
-The cool blue accent identifies focused controls and selected settings. CPU cyan, memory sea glass, graphics amber, and network blue distinguish measurements consistently across cards and resource navigation. The danger color identifies process actions with consequences.
+Values and labels use text colors, never a resource color. The accent marks selection and focus. Danger is reserved for destructive actions and errors. Graphics amber doubles as the warning color for verdicts and paused states, always with an icon or a word.
 
-### Neutral
-
-The graphite background frames lighter section surfaces. Near-white text carries primary readings. Muted text carries descriptions, chart labels, and metadata. Dividers separate navigation and table rows without enclosing every measurement.
+`Automatic` follows the system's light or dark setting with Paper and Graphite. Editing any color leaves Automatic and keeps the customized theme.
 
 ## Typography
 
-The default native font is `.AppleSystemUIFont`, the macOS system UI family. Menlo aligns process table values and compact sidebar readings. Prominent resource readings retain the selected UI font.
+System font throughout, with tabular digits on every figure so changing values never shift the layout. New York appears only for the verdict. Choosing Monospace or a custom font replaces it too.
 
-The page heading uses the headline role. Section headings use the title role. Body text defaults to 13 logical pixels, with a saved range of 11 to 20. Many component labels retain explicit sizes. Users can select Menlo for the UI or load a local font file.
+The smallest text is 11 points. The text size setting scales every type size, plus the sidebar, lane labels, table columns, and inspector.
 
 ## Layout
 
-The window opens at 1320 by 900 logical pixels and supports a minimum of 1000 by 700. A fixed 204-pixel sidebar sits beside the content area. Content has 34-pixel top and horizontal insets, a page header, a scrollable workspace, and a persistent 30-pixel status line.
+The window opens at 1320 by 900 points, restores its last position, and has a minimum of 960 by 640. A 224-point sidebar sits beside a 52-point toolbar. The toolbar is also the title bar. There is no status bar.
 
-Overview pairs adjacent half-width sections with a 16-pixel gap. Full-width sections interrupt the pair. The current implementation preserves these pairs at the minimum window size and scrolls vertically. Resource pages show one expanded section. Process rows use fixed metric columns and a flexible name column.
+Overview is the verdict, then sections. Consecutive full-width chart sections join into one recorder panel. Half-width sections pair up as panels. Order, width, height, visibility, and labels come from the saved section list.
 
-Cards use the comfortable inset by default and the compact inset when requested. Layout editing lives in Appearance, under Layout & text. Stable section identities preserve order, visibility, width, chart height, and custom copy.
+Resource pages share a shape: a large chart, then "Using the most" and the facts behind it. The process table keeps its columns in priority order and drops the CPU bar, PID, Disk, and Memory as space runs out. The inspector sits beside the table and never exceeds 45% of the content area.
 
-## Elevation & Depth
+## Charts
 
-Tonal contrast supplies depth. Cards have no decorative shadows. A translucent black scrim separates process inspection and confirmation from the workspace. Navigation changes fade the page from 86% to full opacity over 180 milliseconds with cubic-out easing.
+- Lines are 1.5 points with a 14% area fill. A dot marks the latest sample.
+- Vertical time divisions align across lanes, so the panel reads like one sheet of recorder paper.
+- Paired measures share one scale, mirrored around a center line, with a label saying which side is which. Never use two y-axes.
+- Scale labels round up to clean values in display units.
+- While history is short, charts use the shortest range that holds it, so a new window is never a sliver at the right edge.
+- Gaps stay gaps. Pauses and missing readings break the trace. A first sample's rates are baselines, so they are not charted.
 
-## Shapes
+## Motion
 
-Cards and confirmation panels use the card radius. Action buttons and resource rows use the control radius. Primary navigation uses the navigation radius. Layout editors use the editor radius. Small circular markers associate resources with their chart colors.
-
-## Logo
-
-Sysly's symbol is a continuous, rounded S trace with a detached sampling dot. The trace connects the name to live system monitoring. It transitions from the interface's blue through CPU cyan to memory sea glass; the dot uses sea glass. A graphite rounded tile frames the macOS app icon and sidebar logo. Keep the standalone symbol transparent, and use the monochrome variant where color is unavailable.
-
-`scripts/icon.swift` owns the geometry and generates the SVG assets in `assets/brand`, a 1024-pixel PNG, and the complete macOS iconset. `scripts/bundle.sh` packages the icon into the app. The sidebar embeds the generated PNG so it also works outside the app bundle.
+Motion answers an action and nothing else: a 160-millisecond page fade, a 150-millisecond inspector fade, and a 180-millisecond toast rise. All three stop when macOS Reduce Motion is on. Nothing moves on its own, and continuous chart scrolling is opt-in because it costs CPU.
 
 ## Components
 
-### Buttons
+**Buttons** come in four weights: primary for the one main action, secondary, quiet, and danger. Focus rings appear for keyboard users only. Clicking hands focus back to the window, because GPUI 0.2.2 has no focus-visible state.
 
-Actions use a translucent divider fill, medium-weight text, and a solid divider fill on hover. A one-pixel accent border marks keyboard focus. Confirmation buttons use a translucent danger fill and danger-colored text.
+**Segmented controls** carry every either-or choice and always show the selection. **Switches** carry on-off settings.
 
-### Inputs
+**Confirmations** for process signals are native sheets. The action keeps its name through the flow: Quit, "Quit Safari?", Quit, "Asked Safari to quit".
 
-`gpui-component` input entities handle editing, selection, and focus. Search includes a search icon and the placeholder "Search name, PID or user". The control theme follows saved background, text, divider, and accent colors.
+**Toasts** report results at the bottom of the window and offer Undo for layout changes. Errors stay until dismissed.
 
-### Navigation
+**Customize** happens on the Overview itself. Sections gain a handle, label fields, a width control, a hide button, and a height grip. Hidden sections wait in a tray at the bottom.
 
-The sidebar lists Overview, Apps & processes, Appearance, and resource shortcuts. Selected rows use a stronger tonal fill. Muted labels become primary text on selection. Resource rows pair a colored marker with a live Menlo reading.
+## Copy
 
-### Resource cards
-
-A section heading and View details action sit above the reading. Charts use fine horizontal guides, scale labels, elapsed history, and semantic resource colors. Memory adds a segmented composition bar. Missing readings and paused intervals break history traces.
-
-### Processes and inspection
-
-The process list has a search field, a tree toggle, sortable columns, and virtualized rows. Inspection opens a panel with identity, measurements, and command text. A separate confirmation explains each signal before the user sends it.
+Sentence case, plain verbs, no jargon. Say "Paused", not "SIGSTOP". Say "Efficiency cores", not "E clusters". Storage uses Finder's decimal units and memory uses binary units, so each matches what macOS shows elsewhere. Errors say what happened and what to do. Empty states offer the next step.
 
 ## Do's and Don'ts
 
 ### Do:
 
-- Do pair measurements with units and plain-language captions.
-- Do preserve resource color roles across charts and navigation.
-- Do retain saved themes, custom fonts, copy, and section arrangements.
-- Do show gaps when sampling pauses or a reading is unavailable.
+- Do lead with an answer, then the evidence.
+- Do use memory pressure, not memory use, to decide whether memory is a problem.
+- Do show "Reading…" until there is a reading, and "Not available" when there will not be one.
+- Do retain saved themes, fonts, copy, and layouts.
 
 ### Don't:
 
-- Don't present missing telemetry as zero.
-- Don't add decorative shadows or continuous decorative animation to the monitoring workspace.
-- Don't imply that memory use alone measures memory pressure.
+- Don't present missing telemetry as zero or as fact, including before the first sample.
+- Don't name a culprit unless one stands out.
+- Don't split the Overview back into identical cards.
+- Don't add decorative shadows or motion. The toast is the only floating element.
 - Don't hide the consequence of a process action behind an unlabeled icon.

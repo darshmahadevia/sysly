@@ -30,37 +30,37 @@ def wait_for(predicate, label, timeout=18):
 
 
 def timestamp(value):
-    match = re.search(r'updated\s+(\d\d:\d\d:\d\d)', value)
+    match = re.search(r'[Uu]pdated\s+(\d\d:\d\d:\d\d)', value)
     return match.group(1) if match else None
 
 
 def open_menu():
     drive('tray')
-    return wait_for(lambda s: all(label in s for label in ['CPU', 'MEM', 'GPU', 'NET', 'Open Sysly', 'Quit Sysly']), 'logo opens four-metric dropdown')
+    return wait_for(lambda s: all(label in s for label in ['Processor', 'Memory', 'Graphics', 'Network', 'Open Sysly', 'Quit Sysly']), 'logo opens four-metric dropdown')
 
 
 state = open_menu()
-assert 'Pause sampling' in state, state
+assert 'Pause Sampling' in state, state
 assert re.search(r'AXMenuBarItem\s+\| Sysly system monitor', state), 'Menu bar must contain only the logo'
 (output / 'menu-live.txt').write_text(state)
 drive('menu-screenshot', output / 'menu-live.png')
 first = timestamp(state)
 assert first, f'No sample timestamp found\n{state}'
 wait_for(lambda s: timestamp(s) is not None and timestamp(s) != first, 'readings update while dropdown remains open')
-drive('menu-press', 'Pause sampling')
+drive('menu-press', 'Pause Sampling')
 time.sleep(0.5)
 state = open_menu()
-assert 'Resume sampling' in state and 'Paused' in state, state
+assert 'Resume Sampling' in state and 'Paused' in state, state
 (output / 'menu-paused.txt').write_text(state)
 drive('menu-screenshot', output / 'menu-paused.png')
 frozen = state
 time.sleep(3)
 assert drive('menu-dump') == frozen, 'Paused readings changed'
 events.append('pause freezes readings and offers resume')
-drive('menu-press', 'Resume sampling')
+drive('menu-press', 'Resume Sampling')
 time.sleep(0.5)
 state = open_menu()
-assert 'Pause sampling' in state and 'Live' in state, state
+assert 'Pause Sampling' in state and 'Updated' in state, state
 events.append('resume restores live state')
 drive('key', 'escape')
 time.sleep(0.3)

@@ -15,9 +15,9 @@ Compile `swiftc scripts/ui.swift -o target/sysly-ui`. Run `target/sysly-ui PID d
 
 ## Drive
 
-Read [the feature map](features/README.md) for the affected user path. Use accessible control names from a fresh dump. `press` operates native accessible actions; `click`, `drag`, and `drag-resize` derive pointer coordinates from the named accessible element. Never use internal setters as interaction evidence.
+Read [the feature map](features/README.md) for the affected user path. GPUI content has no Accessibility labels, so drive it by keyboard and window coordinates, and read it through captures. Native sheets, menus, and the menu bar panel do expose labels: use `dump`, `press`, and `confirm` for those. Never use internal setters as interaction evidence.
 
-Run `python3 scripts/verify_ui.py PID` for process controls and lifecycle. It owns the disposable process it signals. Run `python3 scripts/verify_metrics.py` against the release binary for independent OS-counter and workload checks.
+Run `python3 scripts/verify_gpui.py PID` for process controls and lifecycle, and `python3 scripts/verify_tray.py PID` for the menu bar. The first owns the disposable process it signals. Run `python3 scripts/verify_metrics.py` against the release binary for independent OS-counter and workload checks.
 
 ## Evidence
 
@@ -29,6 +29,6 @@ Use the owned instance's **Quit Sysly** menu action and verify its PID exits. Si
 
 ## Helpers
 
-`target/sysly-ui PID screenshot PATH` captures the real native window. `resize WIDTH HEIGHT` resizes the window. `drag SOURCE_LABEL TARGET_LABEL` moves a section. `drag-resize RESIZE_LABEL DELTA_Y` drags a resize handle.
+`target/sysly-ui PID screenshot PATH` captures the real native window. `resize WIDTH HEIGHT` resizes the window. `hover X Y` leaves the pointer over a chart to capture a scrub. `drag-point X1 Y1 X2 Y2` performs a real pointer drag in window coordinates, for moving sections and resizing them in Customize.
 
 `python3 scripts/measure.py PID --mode visible` observes five windows of CPU, RSS, and physical footprint. Establish visible, hidden, or paused mode through the UI first. CPU time is converted from Mach ticks and cross-checked against `ps`. Do not report obsolete measurements after changing the app.

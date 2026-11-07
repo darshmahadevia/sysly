@@ -6,11 +6,11 @@ Current readings, technical details, search, sorting, process tree, inspector, a
 
 ## How to get to it (user POV)
 
-Open the dashboard. Expand a section's Details. Open Apps & processes or press Command-F to find a process.
+Open Apps & processes or press Command-F to find a process. Select a row to open the inspector beside the table.
 
 ## Driving it with native Accessibility
 
-Run `python3 scripts/verify_ui.py PID`. Its disposable sleep process must appear in search, open an inspector, stop, continue, and exit only after the respective confirmation. Compare process state with the OS, not just an in-app notice.
+Run `python3 scripts/verify_gpui.py PID`. Its disposable sleep process must appear in search, open an inspector, stop, continue, and exit only after the respective native sheet is confirmed. Compare process state with the OS, not just an in-app notice.
 
 ## Gotchas
 
