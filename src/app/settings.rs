@@ -11,6 +11,7 @@ const COLUMN_WIDTH: f32 = 680.;
 
 fn sample_theme(name: &str) -> Option<Theme> {
     match name {
+        "Black" => Some(Theme::black()),
         "Graphite" => Some(Theme::dark()),
         "Paper" => Some(Theme::light()),
         "Midnight" => Some(Theme::midnight()),
@@ -340,7 +341,7 @@ impl App {
             auto,
             cx,
         ));
-        for name in ["Graphite", "Paper", "Midnight", "Ember"] {
+        for name in ["Black", "Graphite", "Paper", "Midnight", "Ember"] {
             let selected = !auto && t.name == name;
             cards = cards.child(self.theme_card(name, sample_theme(name), selected, cx));
         }

@@ -183,6 +183,17 @@ impl Theme {
             ..Self::dark()
         }
     }
+    pub fn black() -> Self {
+        Self {
+            name: "Black".into(),
+            background: [0, 0, 0],
+            surface: [14, 14, 16],
+            text: [240, 241, 244],
+            muted: [160, 162, 170],
+            divider: [40, 41, 46],
+            ..Self::dark()
+        }
+    }
     pub fn midnight() -> Self {
         Self {
             name: "Midnight".into(),
@@ -243,7 +254,7 @@ impl Theme {
 }
 impl Default for Theme {
     fn default() -> Self {
-        Self::dark()
+        Self::black()
     }
 }
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -267,9 +278,7 @@ pub struct Preferences {
     pub sections: Vec<SectionConfig>,
     pub saved_layouts: Vec<NamedLayout>,
     pub previous_layout: Option<Vec<SectionConfig>>,
-    /// Follow the system's light or dark setting with Paper and Graphite. The
-    /// field default is false so settings saved by older versions keep their theme.
-    #[serde(default)]
+    /// Follow the system's light or dark setting with Paper and Graphite.
     pub follow_system: bool,
     /// Left, top, width and height of the window when it last moved.
     pub window: Option<[f32; 4]>,
@@ -290,7 +299,7 @@ impl Default for Preferences {
             sections: default_sections(),
             saved_layouts: Vec::new(),
             previous_layout: None,
-            follow_system: true,
+            follow_system: false,
             window: None,
             menu_bar_reading: MenuBarReading::default(),
         }
@@ -760,6 +769,23 @@ mod tests {
             preferences.normalize();
             assert_eq!(preferences.sections, sections);
         }
+    }
+
+    #[test]
+    fn new_installs_start_on_black_and_saved_themes_stay() {
+        let preferences = Preferences::default();
+        assert_eq!(preferences.theme, Theme::black());
+        assert_eq!(preferences.theme.background, [0, 0, 0]);
+        assert!(!preferences.follow_system);
+
+        let temp = Temp::new();
+        let store = Store::at(temp.0.join("preferences.json"));
+        let saved = Preferences {
+            theme: Theme::dark(),
+            ..Preferences::default()
+        };
+        fs::write(&store.path, serde_json::to_vec(&saved).unwrap()).unwrap();
+        assert_eq!(store.load().0.theme, Theme::dark());
     }
 
     #[test]

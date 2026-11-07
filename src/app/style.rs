@@ -67,7 +67,13 @@ impl Palette {
         };
         Self {
             bg: color(t.background),
-            sidebar: color(mix(t.background, t.text, if dark { 0.025 } else { -0.03 })),
+            // The window blurs what is behind it. A pure black theme stays solid,
+            // otherwise the wallpaper would tint the sidebar.
+            sidebar: if t.background == [0, 0, 0] {
+                color(t.background)
+            } else {
+                color(mix(t.background, t.text, if dark { 0.025 } else { -0.03 })).opacity(0.72)
+            },
             surface: color(t.surface),
             raised: color(mix(t.surface, t.text, 0.07)),
             text,

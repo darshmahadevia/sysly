@@ -53,7 +53,7 @@ spacing:
 
 **Creative North Star: "The recorder"**
 
-Sysly's mark is a trace with a sampling dot. The product follows it. Sysly is one instrument, not a wall of cards. It speaks one plain sentence about how the Mac is doing, then shows every resource on one shared time axis so that causes line up.
+Sysly's mark is three recorder lanes folded into an S, cut by the scrub cursor, with the trace's live end in the accent color. `scripts/icon.swift` draws every logo asset from one set of geometry. The product follows the mark. Sysly is one instrument, not a wall of cards. It speaks one plain sentence about how the Mac is doing, then shows every resource on one shared time axis so that causes line up.
 
 Two things make Sysly distinct, and everything else stays quiet so they can land.
 
@@ -66,7 +66,7 @@ Resource colors identify a resource everywhere: lanes, sparklines, meters, and t
 
 Values and labels use text colors, never a resource color. The accent marks selection and focus. Danger is reserved for destructive actions and errors. Graphics amber doubles as the warning color for verdicts and paused states, always with an icon or a word.
 
-`Automatic` follows the system's light or dark setting with Paper and Graphite. Editing any color leaves Automatic and keeps the customized theme.
+New installs start on Black, whose background is pure `#000000`. A pure black theme keeps the sidebar solid, because the window's blur would otherwise let the wallpaper tint it. `Automatic` follows the system's light or dark setting with Paper and Graphite. Editing any color leaves Automatic and keeps the customized theme.
 
 ## Typography
 

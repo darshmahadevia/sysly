@@ -42,8 +42,8 @@ fn mark() -> AnyElement {
         ))
     });
     gpui::img(image.clone())
-        .w(px(26.))
-        .h(px(26.))
+        .w(px(30.))
+        .h(px(30.))
         .into_any_element()
 }
 
@@ -257,7 +257,7 @@ impl App {
             .h_full()
             .flex()
             .flex_col()
-            .bg(p.sidebar.opacity(0.72))
+            .bg(p.sidebar)
             .border_r_1()
             .border_color(p.line)
             .child(

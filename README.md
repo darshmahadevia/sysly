@@ -86,7 +86,7 @@ On the test Mac, median foreground CPU use fell from 25.52% to 2.58% of one core
 - See apps with their helpers folded in and their real icons, or browse every process as a list or tree.
 - Quit, force quit, pause, or resume a process after a native confirmation, within your account's permissions.
 - Rearrange the Overview in place: drag sections, resize them, rename them, and hide them.
-- Follow the system's light or dark mode, or choose a theme, colors, fonts, and text size. Save named layouts, and import or export themes and layouts.
+- Start on a pure black theme, follow the system's light or dark mode, or choose another theme, colors, fonts, and text size. Save named layouts, and import or export themes and layouts.
 - Adjust the refresh rate, display density, and menu bar reading.
 
 Missing hardware readings appear as not available.

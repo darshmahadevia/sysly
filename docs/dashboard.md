@@ -26,7 +26,7 @@ Press Customize on the Overview, or Command-E. Drag a section by its handle, or 
 
 ## Settings
 
-General covers sampling, density, and the menu bar reading. Appearance covers themes, text, and every color. Automatic follows the system's light or dark setting. Dashboard covers the title, saved layouts, and layout files. Themes and layouts import and export separately.
+General covers sampling, density, and the menu bar reading. Appearance covers themes, text, and every color. Black is the default. Automatic follows the system's light or dark setting. Dashboard covers the title, saved layouts, and layout files. Themes and layouts import and export separately.
 
 ## Keyboard
 
